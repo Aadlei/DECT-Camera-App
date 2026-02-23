@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DECT-Web", "src\DECT-Web\DECT-Web.csproj", "{4BCEB0D8-07B4-4B78-BA6C-9EB2F008EAA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DECT-Api", "src\DECT-Api\DECT-Api.csproj", "{F270B3FE-B30F-42B7-809F-DC8BE08B327E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DECT-Shared", "src\DECT-Shared\DECT-Shared.csproj", "{B1842E50-290D-4222-9601-D78D9DE86987}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4BCEB0D8-07B4-4B78-BA6C-9EB2F008EAA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4BCEB0D8-07B4-4B78-BA6C-9EB2F008EAA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4BCEB0D8-07B4-4B78-BA6C-9EB2F008EAA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4BCEB0D8-07B4-4B78-BA6C-9EB2F008EAA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F270B3FE-B30F-42B7-809F-DC8BE08B327E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F270B3FE-B30F-42B7-809F-DC8BE08B327E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F270B3FE-B30F-42B7-809F-DC8BE08B327E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F270B3FE-B30F-42B7-809F-DC8BE08B327E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1842E50-290D-4222-9601-D78D9DE86987}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1842E50-290D-4222-9601-D78D9DE86987}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1842E50-290D-4222-9601-D78D9DE86987}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1842E50-290D-4222-9601-D78D9DE86987}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
