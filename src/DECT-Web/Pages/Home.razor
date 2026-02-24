@@ -1,0 +1,40 @@
+﻿@page "/"
+@using Camera_DECT.Models
+@using DECT_Web.Services
+@implements IDisposable
+
+@inject MongoDbServices MongoDbService
+
+<PageTitle>Home</PageTitle>
+
+<RadzenCard>
+    @if (Image != null)
+    {
+        <RadzenImage Path="@Image.ImageDataUrl"></RadzenImage>
+    }
+</RadzenCard>
+
+@code {
+    public ImageDto? Image { get; set; }
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImage();
+        _timer = new Timer(async void (_) =>
+        {
+            await LoadImage();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3);
+    }
+
+    private async Task LoadImage()
+    {
+        Image = await MongoDbService.GetLatestImageData();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}
