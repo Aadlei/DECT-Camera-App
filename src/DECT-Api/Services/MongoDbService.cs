@@ -28,6 +28,23 @@ public class MongoDbService
         return MapToDto(doc);
     }
 
+    public async Task<ImageDto?> GetLatestImageDataByIdAsync(int txId)
+    {
+        var filter = Builders<BsonDocument>.Filter.Eq("transmitter_id", txId);
+        var doc = await _images
+            .Find(filter)
+            .SortByDescending(d => d["timestamp"])
+            .FirstOrDefaultAsync();
+        return doc is null ? null : MapToDto(doc);
+    }
+
+    // Get all unique transmitters, for example 1337, 4567..
+    public async Task<List<int>> GetAllUniqueTransmittersAsync()
+    {
+        var result = await _images.DistinctAsync<int>("transmitter_id", FilterDefinition<BsonDocument>.Empty);
+        return await result.ToListAsync();
+    }
+
     // Get all images for a specific transmitter
     public async Task<List<ImageDto>> GetByTransmitterAsync(int txId)
     {

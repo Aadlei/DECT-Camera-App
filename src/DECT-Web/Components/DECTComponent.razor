@@ -1,0 +1,77 @@
+﻿@using Camera_DECT.Models
+@using DECT_Web.Services
+@implements IDisposable
+
+@inject MongoDbServices MongoDbService
+
+<RadzenCard class="p-3">
+    @if (Image is not null)
+    {
+        <RadzenCard Variant="Variant.Outlined"
+                    Style="
+                        display: inline-block;
+                        width: fit-content;
+                        max-width: 100%;
+                        border-radius: 12px;
+                    ">
+            <RadzenStack Gap="0.75rem" Style="padding: 1rem;">
+                <RadzenStack Orientation="Orientation.Horizontal"
+                             AlignItems="AlignItems.Center"
+                             JustifyContent="JustifyContent.SpaceBetween"
+                             Gap="0.75rem"
+                             Style="max-width: 100%;">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="fw-semibold">
+                        Transmitter
+                    </RadzenText>
+
+                    <RadzenBadge Text="@Image.TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary" />
+                </RadzenStack>
+                
+
+                <!-- This is the only knob you typically tweak: --imgw -->
+                <div style="--imgw: 640px; width: min(100%, var(--imgw));">
+                    <RadzenImage Path="@Image.ImageDataUrl"
+                                 Style="width: 100%; height: auto; display: block; border-radius: 10px;" />
+                </div>
+
+                <RadzenStack Orientation="Orientation.Horizontal"
+                             AlignItems="AlignItems.Center"
+                             Gap="0.5rem"
+                             Style="max-width: 100%;">
+                    <RadzenIcon Icon="schedule" class="text-muted" />
+                    <RadzenText TextStyle="TextStyle.Body2" class="text-muted">
+                        Last image:
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" class="fw-semibold" Style="word-break: break-word;">
+                        @Image.Timestamp.ToLocalTime()
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    }
+</RadzenCard>
+@code {
+    [Parameter] public int TransmitterId { get; set; }
+    public ImageDto? Image { get; set; }
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImage();
+        _timer = new Timer(async void (_) =>
+        {
+            await LoadImage();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3));
+    }
+
+    private async Task LoadImage()
+    {
+        Image = await MongoDbService.GetLatestImageDataByIdAsync(TransmitterId);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}
