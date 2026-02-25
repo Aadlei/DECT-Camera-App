@@ -4,3 +4,13 @@ GET {{DECT_Api_HostAddress}}/api/mongodb/latest
 Accept: application/json
 
 ###
+
+GET {{DECT_Api_HostAddress}}/api/mongodb/all-tx-ids
+Accept: application/json
+
+###
+
+GET {{DECT_Api_HostAddress}}/api/mongodb/latest/1337
+Accept: application/json
+
+###

@@ -24,4 +24,10 @@ public class MongoDbController(MongoDbService mongo) : ControllerBase
             return StatusCode(500, ex.Message);
         }
     }
+    
+    [HttpGet("latest/{txId}")]
+    public async Task<ActionResult<List<ImageDto>>> GetLatestImageDataByIdAsync(int txId) => Ok(await mongo.GetLatestImageDataByIdAsync(txId));
+    
+    [HttpGet("all-tx-ids")] 
+    public async Task<ActionResult<List<int>>> GetAllTxIds() => Ok(await mongo.GetAllUniqueTransmittersAsync());
 }
