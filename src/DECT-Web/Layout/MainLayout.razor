@@ -2,12 +2,21 @@
 
 
 <HeadContent>
-    <RadzenTheme Theme="software" />
+    <RadzenTheme Theme="software"/>
 </HeadContent>
 <div class="page">
     <main>
         <RadzenCard class="rz-p-4 rz-m-2 rz-background-color-success rz-text-align-start">
-            <RadzenText class="rz-color-on-success" TextStyle="TextStyle.DisplayH5">DECT NR+</RadzenText>
+            <RadzenStack AlignItems="AlignItems.Start" JustifyContent="JustifyContent.Center">
+                <div style="display: inline-flex; align-items: center; gap: .5rem;">
+                    <RadzenIcon Icon="camera"
+                                IconStyle="IconStyle.Base"
+                                Style="font-size: 2.3rem; line-height: 1;"/>
+                    <RadzenText class="rz-color-on-success" TextStyle="TextStyle.DisplayH5" Style="margin: 0;">
+                        DECT NR+ Monitoring
+                    </RadzenText>
+                </div>
+            </RadzenStack>
         </RadzenCard>
 
         <article class="content px-4">

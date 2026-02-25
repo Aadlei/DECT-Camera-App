@@ -1,0 +1,28 @@
+﻿services:
+  dect-api:
+    image: dect-api:latest
+    container_name: dect-api
+    build:
+      context: .
+      dockerfile: src/DECT-Api/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_ENVIRONMENT=Production
+    restart: unless-stopped
+
+  dect-web:
+    image: dect-web:latest
+    container_name: dect-web
+    build:
+      context: .
+      dockerfile: src/DECT-Web/Dockerfile
+      target: final
+    entrypoint: []
+    command: ["nginx", "-g", "daemon off;"]
+    ports:
+      - "7241:80"
+    depends_on:
+      - dect-api
+    restart: unless-stopped

@@ -5,16 +5,18 @@
 
 @if (TransmitterIds?.Count > 0)
 {
-    @foreach (var id in TransmitterIds)
-    {
-        <DECTComponent TransmitterId="id"></DECTComponent>    
-    }
+    <RadzenStack Orientation="Orientation.Horizontal">
+        @foreach (var id in TransmitterIds)
+        {
+            <DECTComponent TransmitterId="id"></DECTComponent>
+        }
+    </RadzenStack>
 }
 
 
 @code {
     private List<int>? TransmitterIds { get; set; }
-    
+
     protected override async Task OnInitializedAsync()
     {
         TransmitterIds = await MongoDbService.GetAllTransmittersAsync();
