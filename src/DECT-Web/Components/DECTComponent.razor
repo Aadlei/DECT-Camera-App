@@ -62,7 +62,7 @@
         {
             await LoadImage();
             await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0.5));
+        }, null, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0.1));
     }
 
     private async Task LoadImage()
