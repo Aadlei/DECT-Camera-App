@@ -44,6 +44,19 @@ public class MongoDbServices(HttpClient client)
         return new();
     }
 
+    public async Task<List<ImageDto>> GetLastXImagesAsync(int txId, int amount)
+    {
+        try
+        {
+            return await client.GetFromJsonAsync<List<ImageDto>>($"api/mongodb/latest/{txId}/{amount}") ?? new();
+        } catch  (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return new();
+    }
+
     /// <summary>
     /// Returns all transmitter ids that are unique.
     /// </summary>

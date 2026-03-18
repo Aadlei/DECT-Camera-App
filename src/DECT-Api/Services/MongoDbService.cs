@@ -13,6 +13,11 @@ public class MongoDbService
         var client = new MongoClient("mongodb://10.225.150.248:27017");
         var database = client.GetDatabase("mesh_network");
         _images = database.GetCollection<BsonDocument>("images");
+        
+        _images.Indexes.CreateOne(new CreateIndexModel<BsonDocument>(
+            Builders<BsonDocument>.IndexKeys
+                .Ascending("transmitter_id")
+                .Descending("timestamp")));
     }
 
     // Get the latest image
@@ -36,6 +41,17 @@ public class MongoDbService
             .SortByDescending(d => d["timestamp"])
             .FirstOrDefaultAsync();
         return doc is null ? null : MapToDto(doc);
+    }
+
+    public async Task<List<ImageDto>> GetLatestImagesByIdAsync(int txId, int amount)
+    {
+        var filter = Builders<BsonDocument>.Filter.Eq("transmitter_id", txId);
+        var doc = await _images
+            .Find(filter)
+            .SortByDescending(d => d["timestamp"])
+            .Limit(amount)
+            .ToListAsync();
+        return doc.Select(MapToDto).ToList();
     }
 
     // Get all unique transmitters, for example 1337, 4567..

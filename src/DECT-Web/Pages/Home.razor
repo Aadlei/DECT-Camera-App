@@ -1,11 +1,32 @@
 ﻿@page "/"
+@using System.Diagnostics
 @using DECT_Web.Components
 @using DECT_Web.Services
 @inject MongoDbServices MongoDbService
 
 @if (TransmitterIds?.Count > 0)
 {
+    <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
+        @_stopwatch.Elapsed
+    </RadzenStack>
+    <RadzenStack 
+        Orientation="Orientation.Horizontal" 
+        AlignItems="AlignItems.Center" 
+        JustifyContent="JustifyContent.Center" 
+        class="rz-my-5">
+        @if (!_stopwatch.IsRunning)
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Info" Click="InitiateExperimentAsync">START</RadzenButton>
+        }
+        else
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="StopExperiment" IconColor="red">STOP</RadzenButton>
+        }
+        <RadzenButton ButtonStyle="ButtonStyle.Success" Disabled="!IsDataReady">EXPORT</RadzenButton>
+
+    </RadzenStack>
     <RadzenStack Orientation="Orientation.Horizontal">
+        
         @foreach (var id in TransmitterIds)
         {
             <DECTComponent TransmitterId="id"></DECTComponent>
@@ -16,10 +37,40 @@
 
 @code {
     private List<int>? TransmitterIds { get; set; }
+    private Stopwatch? _stopwatch = new();
+    private PeriodicTimer _timer;
+    private CancellationTokenSource? _cts;
+    private bool IsDataReady { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
     {
         TransmitterIds = await MongoDbService.GetAllTransmittersAsync();
+    }
+
+    private async Task InitiateExperimentAsync()
+    {
+        _stopwatch.Reset();
+        _stopwatch.Start();
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await _timer.WaitForNextTickAsync(_cts.Token))
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+    }
+    
+    private void StopExperiment()
+    {
+        _stopwatch.Stop();
+        _cts?.Cancel();
+        _timer?.Dispose();
     }
 
 }

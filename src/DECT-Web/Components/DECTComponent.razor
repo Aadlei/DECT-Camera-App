@@ -27,12 +27,12 @@
                     <RadzenBadge Text="@Image.TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary" />
                 </RadzenStack>
                 
-
-                <!-- This is the only knob you typically tweak: --imgw -->
                 <div style="--imgw: 640px; width: min(100%, var(--imgw));">
                     <RadzenImage Path="@Image.ImageDataUrl"
                                  Style="width: 100%; height: auto; display: block; border-radius: 10px;" />
                 </div>
+                
+                <RadzenSlider Style="width:100%" TValue="int" Min="0" Max="@(Images.Count - 1)" @bind-Value="_imageIndex" />
 
                 <RadzenStack Orientation="Orientation.Horizontal"
                              AlignItems="AlignItems.Center"
@@ -46,13 +46,84 @@
                         @Image.Timestamp.ToLocalTime()
                     </RadzenText>
                 </RadzenStack>
+                
+                
             </RadzenStack>
+            <RadzenPanel AllowCollapse class="rz-my-5">
+                    <HeaderTemplate>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center">
+                            <RadzenIcon Icon="assessment" class="rz-me-1" /><b>Metrics</b>
+                        </RadzenText>
+                    </HeaderTemplate>
+                    <ChildContent>
+                        <RadzenTable>
+                            <RadzenTableHeader>
+                                <RadzenTableHeaderRow>
+                                    <RadzenTableHeaderCell>
+                                        Column 0
+                                    </RadzenTableHeaderCell>
+                                    <RadzenTableHeaderCell>
+                                        Column 1
+                                    </RadzenTableHeaderCell>
+                                    <RadzenTableHeaderCell>
+                                        Column 2
+                                    </RadzenTableHeaderCell>
+                                </RadzenTableHeaderRow>
+                            </RadzenTableHeader>
+                            <RadzenTableBody>
+                                <RadzenTableRow>
+                                    <RadzenTableCell>
+                                        Cell 0 1
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 0 2
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 0 3
+                                    </RadzenTableCell>
+                                </RadzenTableRow>
+                                <RadzenTableRow>
+                                    <RadzenTableCell>
+                                        Cell 1 1
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 1 2
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 1 3
+                                    </RadzenTableCell>
+                                </RadzenTableRow>
+                                <RadzenTableRow>
+                                    <RadzenTableCell>
+                                        Cell 2 1
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 2 2
+                                    </RadzenTableCell>
+                                    <RadzenTableCell>
+                                        Cell 2 3
+                                    </RadzenTableCell>
+                                </RadzenTableRow>
+                            </RadzenTableBody>
+                        </RadzenTable>
+                    </ChildContent>
+
+                </RadzenPanel>
+                <RadzenPanel AllowCollapse class="rz-my-10">
+                    <HeaderTemplate>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                            <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1" /><b>Graphs</b>
+                        </RadzenText>
+                    </HeaderTemplate>
+                </RadzenPanel>
         </RadzenCard>
     }
 </RadzenCard>
 @code {
     [Parameter] public int TransmitterId { get; set; }
-    public ImageDto? Image { get; set; }
+    private int _imageIndex = 0;
+    public List<ImageDto> Images { get; set; }
+    private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
     private Timer? _timer;
 
     protected override async Task OnInitializedAsync()
@@ -60,14 +131,15 @@
         await LoadImage();
         _timer = new Timer(async void (_) =>
         {
-            await LoadImage();
+            //await LoadImage();
             await InvokeAsync(StateHasChanged);
         }, null, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0.1));
     }
 
     private async Task LoadImage()
     {
-        Image = await MongoDbService.GetLatestImageDataByIdAsync(TransmitterId);
+        Images = await MongoDbService.GetLastXImagesAsync(TransmitterId, 1000);
+        _imageIndex = Images.Count-1;
     }
 
     public void Dispose()
