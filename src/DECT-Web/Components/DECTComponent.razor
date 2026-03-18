@@ -49,10 +49,10 @@
                 
                 
             </RadzenStack>
-            <RadzenPanel AllowCollapse class="rz-my-5">
+            <RadzenPanel Collapsed="true" AllowCollapse  class="rz-my-5">
                     <HeaderTemplate>
                         <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center">
-                            <RadzenIcon Icon="assessment" class="rz-me-1" /><b>Metrics</b>
+                            <RadzenIcon Icon="assessment" class="rz-me-1" /><b>@Images.Count Metrics</b>
                         </RadzenText>
                     </HeaderTemplate>
                     <ChildContent>
@@ -60,56 +60,31 @@
                             <RadzenTableHeader>
                                 <RadzenTableHeaderRow>
                                     <RadzenTableHeaderCell>
-                                        Column 0
+                                        Test
                                     </RadzenTableHeaderCell>
                                     <RadzenTableHeaderCell>
-                                        Column 1
+                                        Bytes
                                     </RadzenTableHeaderCell>
                                     <RadzenTableHeaderCell>
-                                        Column 2
+                                        Hops
                                     </RadzenTableHeaderCell>
                                 </RadzenTableHeaderRow>
                             </RadzenTableHeader>
                             <RadzenTableBody>
-                                <RadzenTableRow>
-                                    <RadzenTableCell>
-                                        Cell 0 1
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 0 2
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 0 3
-                                    </RadzenTableCell>
-                                </RadzenTableRow>
-                                <RadzenTableRow>
-                                    <RadzenTableCell>
-                                        Cell 1 1
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 1 2
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 1 3
-                                    </RadzenTableCell>
-                                </RadzenTableRow>
-                                <RadzenTableRow>
-                                    <RadzenTableCell>
-                                        Cell 2 1
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 2 2
-                                    </RadzenTableCell>
-                                    <RadzenTableCell>
-                                        Cell 2 3
-                                    </RadzenTableCell>
-                                </RadzenTableRow>
+                                @foreach (var image in Images)
+                                {
+                                    <RadzenTableRow>
+                                        <RadzenTableCell>@image.Timestamp</RadzenTableCell>
+                                        <RadzenTableCell>@image.SizeBytes</RadzenTableCell>
+                                        <RadzenTableCell>@image.HopCount</RadzenTableCell>
+                                    </RadzenTableRow>
+                                }
                             </RadzenTableBody>
                         </RadzenTable>
                     </ChildContent>
 
                 </RadzenPanel>
-                <RadzenPanel AllowCollapse class="rz-my-10">
+                <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-10">
                     <HeaderTemplate>
                         <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                             <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1" /><b>Graphs</b>
@@ -138,7 +113,7 @@
 
     private async Task LoadImage()
     {
-        Images = await MongoDbService.GetLastXImagesAsync(TransmitterId, 1000);
+        Images = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
         _imageIndex = Images.Count-1;
     }
 
