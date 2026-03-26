@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
-using Camera_DECT.Models;
+using DECT_Shared.Models;
 
 namespace DECT_Web.Services;
 

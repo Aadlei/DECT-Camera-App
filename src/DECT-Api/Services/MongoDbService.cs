@@ -1,4 +1,4 @@
-﻿using Camera_DECT.Models;
+﻿using DECT_Shared.Models;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -86,7 +86,7 @@ public class MongoDbService
         TransmitterId = doc.GetValue("transmitter_id", 0).ToInt32(),
         Image = doc.GetValue("image_data").AsByteArray,
         HopCount = doc.GetValue("hop_count", 0).ToInt32(),
-        Timestamp = doc["timestamp"].ToUniversalTime(),
+        DeviceTimestamp = doc["timestamp"].ToUniversalTime(),
         SizeBytes = doc["size_bytes"].ToInt32(),
     };
 }

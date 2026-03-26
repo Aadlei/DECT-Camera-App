@@ -1,35 +1,46 @@
 ﻿@page "/"
 @using System.Diagnostics
+@using System.Text
+@using DECT_Shared.Models
 @using DECT_Web.Components
 @using DECT_Web.Services
+@using Radzen.Blazor.Markdown
 @inject MongoDbServices MongoDbService
+@inject IJSRuntime JS
 
 @if (TransmitterIds?.Count > 0)
 {
     <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
-        @_stopwatch.Elapsed
+        <RadzenText TextStyle="TextStyle.H4" class="rz-my-2"
+                    Style="font-variant-numeric: tabular-nums;">
+            @_stopwatch.Elapsed.ToString(@"hh\:mm\:ss\.ff")
+        </RadzenText>
     </RadzenStack>
-    <RadzenStack 
-        Orientation="Orientation.Horizontal" 
-        AlignItems="AlignItems.Center" 
-        JustifyContent="JustifyContent.Center" 
-        class="rz-my-5">
-        @if (!_stopwatch.IsRunning)
+    <RadzenStack Orientation="Orientation.Horizontal"
+                 AlignItems="AlignItems.Center"
+                 JustifyContent="JustifyContent.Center"
+                 Gap="0.5rem" class="rz-my-5">
+        @if (!_experimentRunning)
         {
-            <RadzenButton ButtonStyle="ButtonStyle.Info" Click="InitiateExperimentAsync">START</RadzenButton>
+            <RadzenButton ButtonStyle="ButtonStyle.Info" Click="InitiateExperimentAsync" Text="START" />
         }
         else
         {
-            <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="StopExperiment" IconColor="red">STOP</RadzenButton>
+            <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="StopExperimentAsync" Text="STOP" />
         }
-        <RadzenButton ButtonStyle="ButtonStyle.Success" Disabled="!IsDataReady">EXPORT</RadzenButton>
-
+        <RadzenButton ButtonStyle="ButtonStyle.Success"
+                      Disabled="@(!IsExportReady)"
+                      Click="ExportCsvAsync"
+                      Text="EXPORT CSV" />
     </RadzenStack>
-    <RadzenStack Orientation="Orientation.Horizontal">
-        
+    <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap"
+                 JustifyContent="JustifyContent.Center" Gap="1rem">
         @foreach (var id in TransmitterIds)
         {
-            <DECTComponent TransmitterId="id"></DECTComponent>
+            <DECTComponent TransmitterId="id"
+                           ExperimentRunning="_experimentRunning"
+                           ExperimentStartUtc="_experimentStartUtc"
+                           SessionChanged="s => OnSessionChanged(id, s)" />
         }
     </RadzenStack>
 }
@@ -37,40 +48,100 @@
 
 @code {
     private List<int>? TransmitterIds { get; set; }
-    private Stopwatch? _stopwatch = new();
-    private PeriodicTimer _timer;
+    private readonly Stopwatch _stopwatch = new();
+    private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
-    private bool IsDataReady { get; set; } = false;
+
+    private bool _experimentRunning;
+    private DateTime? _experimentStartUtc;
+
+    // Collect each component's session for aggregated CSV export
+    private readonly Dictionary<int, ExperimentDto?> _sessions = new();
+
+    private bool IsExportReady =>
+        !_experimentRunning && _sessions.Values.Any(s => s is { TotalImages: > 0 });
 
     protected override async Task OnInitializedAsync()
     {
         TransmitterIds = await MongoDbService.GetAllTransmittersAsync();
     }
-
+    
+    // ── Start ───────────────────────────────────────────────
     private async Task InitiateExperimentAsync()
     {
+        _experimentStartUtc = DateTime.UtcNow;
+        _experimentRunning = true;
+        _sessions.Clear();
+
         _stopwatch.Reset();
         _stopwatch.Start();
+
         _cts = new CancellationTokenSource();
         _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+
         _ = Task.Run(async () =>
         {
             try
             {
                 while (await _timer.WaitForNextTickAsync(_cts.Token))
-                {
                     await InvokeAsync(StateHasChanged);
-                }
             }
             catch (OperationCanceledException) { }
         });
     }
     
-    private void StopExperiment()
+    // ── Stop ───────────────────────────────────────────────
+    private void StopExperimentAsync()
     {
+        _experimentRunning = false;
         _stopwatch.Stop();
         _cts?.Cancel();
         _timer?.Dispose();
+    }
+    
+    private void OnSessionChanged(int txId, ExperimentDto? session)
+    {
+        _sessions[txId] = session;
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        var allEntries = _sessions.Values
+            .Where(s => s is not null)
+            .SelectMany(s => s!.Entries)
+            .OrderBy(e => e.SequenceNumber)
+            .ToList();
+
+        if (allEntries.Count == 0) return;
+
+        var elapsed = _stopwatch.Elapsed;
+        var totalBytes = allEntries.Sum(e => e.SizeBytes);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Seq,TransmitterId,DeviceTimestampUtc,ReceivedAtUtc,SizeBytes,HopCount");
+
+        foreach (var e in allEntries)
+        {
+            sb.AppendLine(string.Join(",",
+                e.SequenceNumber,
+                e.TransmitterId,
+                e.DeviceTimestamp.ToString("O"),
+                e.ReceivedAt.ToString("O"),
+                e.SizeBytes,
+                e.HopCount));
+        }
+
+        sb.AppendLine();
+        sb.AppendLine($"# Experiment Duration (s),{elapsed.TotalSeconds:F2}");
+        sb.AppendLine($"# Total Images,{allEntries.Count}");
+        sb.AppendLine($"# Total Bytes,{totalBytes}");
+        sb.AppendLine($"# Throughput (kbps),{(elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / 1000 / elapsed.TotalSeconds : 0):F2}");
+
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.csv";
+
+        await JS.InvokeVoidAsync("downloadFile", fileName, base64);
     }
 
 }

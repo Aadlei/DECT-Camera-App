@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
-using Camera_DECT.Models;
 using DECT_Api.Services;
+using DECT_Shared.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DECT_Api.Controllers;

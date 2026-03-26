@@ -1,5 +1,6 @@
-﻿@using Camera_DECT.Models
+﻿@using DECT_Shared.Models
 @using DECT_Web.Services
+@using Radzen.Blazor.Markdown
 @implements IDisposable
 
 @inject MongoDbServices MongoDbService
@@ -8,114 +9,228 @@
     @if (Image is not null)
     {
         <RadzenCard Variant="Variant.Outlined"
-                    Style="
-                        display: inline-block;
-                        width: fit-content;
-                        max-width: 100%;
-                        border-radius: 12px;
-                    ">
+                    Style="display: inline-block; width: fit-content; max-width: 100%; border-radius: 12px;">
             <RadzenStack Gap="0.75rem" Style="padding: 1rem;">
+
+                @* ── Header ── *@
                 <RadzenStack Orientation="Orientation.Horizontal"
                              AlignItems="AlignItems.Center"
                              JustifyContent="JustifyContent.SpaceBetween"
-                             Gap="0.75rem"
-                             Style="max-width: 100%;">
+                             Gap="0.75rem">
                     <RadzenText TextStyle="TextStyle.Subtitle1" class="fw-semibold">
                         Transmitter
                     </RadzenText>
-
-                    <RadzenBadge Text="@Image.TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary" />
+                    <RadzenBadge Text="@TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary" />
                 </RadzenStack>
-                
+
+                @* ── Image ── *@
                 <div style="--imgw: 640px; width: min(100%, var(--imgw));">
                     <RadzenImage Path="@Image.ImageDataUrl"
                                  Style="width: 100%; height: auto; display: block; border-radius: 10px;" />
                 </div>
-                
-                <RadzenSlider Style="width:100%" TValue="int" Min="0" Max="@(Images.Count - 1)" @bind-Value="_imageIndex" />
 
+                <RadzenSlider Style="width:100%" TValue="int"
+                              Min="0" Max="@(Images.Count - 1)" @bind-Value="_imageIndex" />
+
+                @* ── Timestamp ── *@
                 <RadzenStack Orientation="Orientation.Horizontal"
-                             AlignItems="AlignItems.Center"
-                             Gap="0.5rem"
-                             Style="max-width: 100%;">
+                             AlignItems="AlignItems.Center" Gap="0.5rem">
                     <RadzenIcon Icon="schedule" class="text-muted" />
                     <RadzenText TextStyle="TextStyle.Body2" class="text-muted">
                         Last image:
                     </RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body2" class="fw-semibold" Style="word-break: break-word;">
-                        @Image.Timestamp.ToLocalTime()
+                    <RadzenText TextStyle="TextStyle.Body2" class="fw-semibold"
+                                Style="word-break: break-word;">
+                        @Image.DeviceTimestamp.ToLocalTime()
                     </RadzenText>
                 </RadzenStack>
-                
-                
             </RadzenStack>
-            <RadzenPanel Collapsed="true" AllowCollapse  class="rz-my-5">
+
+            @* ── Metrics Panel (visible during / after experiment) ── *@
+            @if (Session is not null)
+            {
+                <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-5">
                     <HeaderTemplate>
-                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center">
-                            <RadzenIcon Icon="assessment" class="rz-me-1" /><b>@Images.Count Metrics</b>
+                        <RadzenText TextStyle="TextStyle.H6"
+                                    class="rz-display-flex rz-align-items-center">
+                            <RadzenIcon Icon="speed" class="rz-me-1" />
+                            <b>Experiment Metrics</b>
                         </RadzenText>
                     </HeaderTemplate>
                     <ChildContent>
-                        <RadzenTable>
-                            <RadzenTableHeader>
-                                <RadzenTableHeaderRow>
-                                    <RadzenTableHeaderCell>
-                                        Test
-                                    </RadzenTableHeaderCell>
-                                    <RadzenTableHeaderCell>
-                                        Bytes
-                                    </RadzenTableHeaderCell>
-                                    <RadzenTableHeaderCell>
-                                        Hops
-                                    </RadzenTableHeaderCell>
-                                </RadzenTableHeaderRow>
-                            </RadzenTableHeader>
-                            <RadzenTableBody>
-                                @foreach (var image in Images)
-                                {
-                                    <RadzenTableRow>
-                                        <RadzenTableCell>@image.Timestamp</RadzenTableCell>
-                                        <RadzenTableCell>@image.SizeBytes</RadzenTableCell>
-                                        <RadzenTableCell>@image.HopCount</RadzenTableCell>
-                                    </RadzenTableRow>
-                                }
-                            </RadzenTableBody>
-                        </RadzenTable>
+                        <RadzenStack Gap="0.5rem" Style="padding: 0.75rem;">
+                            <RadzenRow Gap="0.75rem" RowGap="0.75rem">
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Images" Value="@Session.TotalImages.ToString()" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Total Data" Value="@FormatBytes(Session.TotalBytes)" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Throughput" Value="@($"{Session.ThroughputBytesPerSecond:F1} kbps")" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Avg Inter-Arrival" Value="@($"{Session.AvgInterArrivalMs:F0} ms")" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
                     </ChildContent>
+                </RadzenPanel>
+            }
 
-                </RadzenPanel>
-                <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-10">
-                    <HeaderTemplate>
-                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
-                            <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1" /><b>Graphs</b>
-                        </RadzenText>
-                    </HeaderTemplate>
-                </RadzenPanel>
+            @* ── Raw data table ── *@
+            <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-5">
+                <HeaderTemplate>
+                    <RadzenText TextStyle="TextStyle.H6"
+                                class="rz-display-flex rz-align-items-center">
+                        <RadzenIcon Icon="assessment" class="rz-me-1" />
+                        <b>@Images.Count Metrics</b>
+                    </RadzenText>
+                </HeaderTemplate>
+                <ChildContent>
+                    <RadzenTable>
+                        <RadzenTableHeader>
+                            <RadzenTableHeaderRow>
+                                <RadzenTableHeaderCell>Test</RadzenTableHeaderCell>
+                                <RadzenTableHeaderCell>Bytes</RadzenTableHeaderCell>
+                                <RadzenTableHeaderCell>Hops</RadzenTableHeaderCell>
+                            </RadzenTableHeaderRow>
+                        </RadzenTableHeader>
+                        <RadzenTableBody>
+                            @foreach (var image in Images)
+                            {
+                                <RadzenTableRow>
+                                    <RadzenTableCell>@image.DeviceTimestamp</RadzenTableCell>
+                                    <RadzenTableCell>@image.SizeBytes</RadzenTableCell>
+                                    <RadzenTableCell>@image.HopCount</RadzenTableCell>
+                                </RadzenTableRow>
+                            }
+                        </RadzenTableBody>
+                    </RadzenTable>
+                </ChildContent>
+            </RadzenPanel>
+
+            @* ── Graphs placeholder ── *@
+            <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-10">
+                <HeaderTemplate>
+                    <RadzenText TextStyle="TextStyle.H6"
+                                class="rz-display-flex rz-align-items-center rz-m-0">
+                        <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1" />
+                        <b>Graphs</b>
+                    </RadzenText>
+                </HeaderTemplate>
+            </RadzenPanel>
         </RadzenCard>
     }
 </RadzenCard>
 @code {
     [Parameter] public int TransmitterId { get; set; }
-    private int _imageIndex = 0;
-    public List<ImageDto> Images { get; set; }
-    private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
-    private Timer? _timer;
+    
+    // Experiment parameters
+    [Parameter] public bool ExperimentRunning { get; set; }
 
+    /// <summary>UTC timestamp when the experiment was started. Null = no experiment.</summary>
+    [Parameter] public DateTime? ExperimentStartUtc { get; set; }
+
+    /// <summary>Expose session so parent can aggregate for CSV export.</summary>
+    [Parameter] public EventCallback<ExperimentDto?> SessionChanged { get; set; }
+
+    public ExperimentDto? Session { get; private set; }
+    
+    private int _imageIndex;
+    public List<ImageDto> Images { get; set; } = new();
+    private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
+
+    private Timer? _timer;
+    private readonly HashSet<string> _seenImageKeys = new();
+    private int _sequenceCounter;
+    private bool _wasRunning;
+    
     protected override async Task OnInitializedAsync()
     {
-        await LoadImage();
-        _timer = new Timer(async void (_) =>
-        {
-            //await LoadImage();
-            await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0.1));
+        await LoadImages();
+        StartPolling();
     }
 
-    private async Task LoadImage()
+    protected override async Task OnParametersSetAsync()
+    {
+        // Experiment just started
+        if (ExperimentRunning && !_wasRunning)
+        {
+            Session = new ExperimentDto() { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
+            _seenImageKeys.Clear();
+            _sequenceCounter = 0;
+            await NotifySessionChanged();
+        }
+
+        // Experiment just stopped
+        if (!ExperimentRunning && _wasRunning && Session is not null)
+        {
+            Session.EndTime = DateTime.UtcNow;
+            await NotifySessionChanged();
+        }
+
+        _wasRunning = ExperimentRunning;
+    }
+
+    private void StartPolling()
+    {
+        _timer = new Timer(async void (_) =>
+        {
+            await LoadImages();
+
+            if (ExperimentRunning && Session is not null)
+                CollectMetrics();
+
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+    }
+
+    private async Task LoadImages()
     {
         Images = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
-        _imageIndex = Images.Count-1;
+        if (_imageIndex >= Images.Count)
+            _imageIndex = Math.Max(0, Images.Count - 1);
     }
+
+    private void CollectMetrics()
+    {
+        if (Session is null) return;
+
+        foreach (var img in Images)
+        {
+            if (img.DeviceTimestamp < Session.StartTime) continue;
+
+            var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
+            if (!_seenImageKeys.Add(key)) continue;
+
+            Session.Entries.Add(new ImageDto()
+            {
+                TransmitterId = img.TransmitterId,
+                DeviceTimestamp = img.DeviceTimestamp,
+                ReceivedAt = DateTime.UtcNow,
+                SizeBytes = img.SizeBytes,
+                HopCount = img.HopCount,
+                SequenceNumber = _sequenceCounter++,
+            });
+        }
+    }
+
+    private async Task NotifySessionChanged()
+    {
+        if (SessionChanged.HasDelegate)
+            await SessionChanged.InvokeAsync(Session);
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= 1_048_576 => $"{bytes / 1_048_576.0:F1} MB",
+        >= 1024      => $"{bytes / 1024.0:F1} KB",
+        _            => $"{bytes} B"
+    };
 
     public void Dispose()
     {
