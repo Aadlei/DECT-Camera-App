@@ -15,6 +15,7 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddHttpClient<MongoDbServices>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
+    Console.WriteLine($"API set to: {client.BaseAddress}");
 });
 
 await builder.Build().RunAsync();

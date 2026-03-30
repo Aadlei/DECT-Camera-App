@@ -20,22 +20,25 @@
                     <RadzenText TextStyle="TextStyle.Subtitle1" class="fw-semibold">
                         Transmitter
                     </RadzenText>
-                    <RadzenBadge Text="@TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary" />
+                    <RadzenBadge Text="@TransmitterId.ToString()" BadgeStyle="BadgeStyle.Primary"/>
                 </RadzenStack>
 
                 @* ── Image ── *@
                 <div style="--imgw: 640px; width: min(100%, var(--imgw));">
                     <RadzenImage Path="@Image.ImageDataUrl"
-                                 Style="width: 100%; height: auto; display: block; border-radius: 10px;" />
+                                 Style="width: 100%; height: auto; display: block; border-radius: 10px;"/>
                 </div>
 
-                <RadzenSlider Style="width:100%" TValue="int"
-                              Min="0" Max="@(Images.Count - 1)" @bind-Value="_imageIndex" />
+                @if (Images.Count > 1)
+                {
+                    <RadzenSlider Style="width:100%" TValue="int"
+                                  Min="0" Max="@(Images.Count - 1)" @bind-Value="_imageIndex"/>
+                }
 
                 @* ── Timestamp ── *@
                 <RadzenStack Orientation="Orientation.Horizontal"
                              AlignItems="AlignItems.Center" Gap="0.5rem">
-                    <RadzenIcon Icon="schedule" class="text-muted" />
+                    <RadzenIcon Icon="schedule" class="text-muted"/>
                     <RadzenText TextStyle="TextStyle.Body2" class="text-muted">
                         Last image:
                     </RadzenText>
@@ -53,7 +56,7 @@
                     <HeaderTemplate>
                         <RadzenText TextStyle="TextStyle.H6"
                                     class="rz-display-flex rz-align-items-center">
-                            <RadzenIcon Icon="speed" class="rz-me-1" />
+                            <RadzenIcon Icon="speed" class="rz-me-1"/>
                             <b>Experiment Metrics</b>
                         </RadzenText>
                     </HeaderTemplate>
@@ -61,19 +64,21 @@
                         <RadzenStack Gap="0.5rem" Style="padding: 0.75rem;">
                             <RadzenRow Gap="0.75rem" RowGap="0.75rem">
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Images" Value="@Session.TotalImages.ToString()" />
+                                    <MetricTile Label="Images" Value="@Session.TotalImages.ToString()"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Total Data" Value="@FormatBytes(Session.TotalBytes)" />
+                                    <MetricTile Label="Total Data" Value="@FormatBytes(Session.TotalBytes)"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Throughput" Value="@($"{Session.ThroughputBytesPerSecond:F1} kbps")" />
+                                    <MetricTile Label="Throughput"
+                                                Value="@($"{Session.ThroughputBytesPerSecond:F1} kbps")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Avg Inter-Arrival" Value="@($"{Session.AvgInterArrivalMs:F0} ms")" />
+                                    <MetricTile Label="Avg Inter-Arrival"
+                                                Value="@($"{Session.AvgInterArrivalMs:F0} ms")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")" />
+                                    <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")"/>
                                 </RadzenColumn>
                             </RadzenRow>
                         </RadzenStack>
@@ -81,74 +86,120 @@
                 </RadzenPanel>
             }
 
-            @* ── Raw data table ── *@
-            <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-5">
+            @* ── Graphs ── *@
+            <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
-                    <RadzenText TextStyle="TextStyle.H6"
-                                class="rz-display-flex rz-align-items-center">
-                        <RadzenIcon Icon="assessment" class="rz-me-1" />
-                        <b>@Images.Count Metrics</b>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                        <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1"/>
+                        <b>Inter-Arrival Time</b>
                     </RadzenText>
                 </HeaderTemplate>
                 <ChildContent>
-                    <RadzenTable>
-                        <RadzenTableHeader>
-                            <RadzenTableHeaderRow>
-                                <RadzenTableHeaderCell>Test</RadzenTableHeaderCell>
-                                <RadzenTableHeaderCell>Bytes</RadzenTableHeaderCell>
-                                <RadzenTableHeaderCell>Hops</RadzenTableHeaderCell>
-                            </RadzenTableHeaderRow>
-                        </RadzenTableHeader>
-                        <RadzenTableBody>
-                            @foreach (var image in Images)
-                            {
-                                <RadzenTableRow>
-                                    <RadzenTableCell>@image.DeviceTimestamp</RadzenTableCell>
-                                    <RadzenTableCell>@image.SizeBytes</RadzenTableCell>
-                                    <RadzenTableCell>@image.HopCount</RadzenTableCell>
-                                </RadzenTableRow>
-                            }
-                        </RadzenTableBody>
-                    </RadzenTable>
+                    @if (_interArrivalData.Count > 1)
+                    {
+                        <div id="@($"interarrival-chart-{TransmitterId}")">
+                            <RadzenChart Style="height: 250px;">
+                                <RadzenLineSeries Data="_interArrivalData"
+                                                  CategoryProperty="Seq"
+                                                  ValueProperty="Ms"
+                                                  Title="ms"
+                                                  Smooth="false">
+                                    <RadzenMarkers MarkerType="MarkerType.None"/>
+                                </RadzenLineSeries>
+                                <RadzenCategoryAxis>
+                                    <RadzenAxisTitle Text="image #"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis>
+                                    <RadzenAxisTitle Text="ms"/>
+                                </RadzenValueAxis>
+                            </RadzenChart>
+                        </div>
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="text-muted" Style="padding: 1rem;">
+                            Waiting for data...
+                        </RadzenText>
+                    }
                 </ChildContent>
             </RadzenPanel>
-
-            @* ── Graphs placeholder ── *@
-            <RadzenPanel Collapsed="true" AllowCollapse class="rz-my-10">
+            <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
-                    <RadzenText TextStyle="TextStyle.H6"
-                                class="rz-display-flex rz-align-items-center rz-m-0">
-                        <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1" />
-                        <b>Graphs</b>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                        <RadzenIcon Icon="speed" class="rz-me-1"/>
+                        <b>Throughput</b>
                     </RadzenText>
                 </HeaderTemplate>
+                <ChildContent>
+                    @if (_throughputData.Count > 1)
+                    {
+                        <div id="@($"throughput-chart-{TransmitterId}")">
+                        <RadzenChart Style="height: 250px;">
+                            <RadzenLineSeries Data="_throughputData"
+                                              CategoryProperty="ElapsedSeconds"
+                                              ValueProperty="Kbps"
+                                              Title="kbps"
+                                              Smooth="true">
+                                <RadzenMarkers MarkerType="MarkerType.None"/>
+                            </RadzenLineSeries>
+                            <RadzenCategoryAxis>
+                                <RadzenAxisTitle Text="Elapsed (s)"/>
+                            </RadzenCategoryAxis>
+                            <RadzenValueAxis>
+                                <RadzenAxisTitle Text="kbps"/>
+                            </RadzenValueAxis>
+                        </RadzenChart>
+                        </div>
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="text-muted" Style="padding: 1rem;">
+                            Waiting for data...
+                        </RadzenText>
+                    }
+                </ChildContent>
             </RadzenPanel>
         </RadzenCard>
     }
 </RadzenCard>
+
+
 @code {
     [Parameter] public int TransmitterId { get; set; }
-    
+
     // Experiment parameters
     [Parameter] public bool ExperimentRunning { get; set; }
 
     /// <summary>UTC timestamp when the experiment was started. Null = no experiment.</summary>
-    [Parameter] public DateTime? ExperimentStartUtc { get; set; }
+    [Parameter]
+    public DateTime? ExperimentStartUtc { get; set; }
 
     /// <summary>Expose session so parent can aggregate for CSV export.</summary>
-    [Parameter] public EventCallback<ExperimentDto?> SessionChanged { get; set; }
+    [Parameter]
+    public EventCallback<ExperimentDto?> SessionChanged { get; set; }
 
     public ExperimentDto? Session { get; private set; }
-    
-    private int _imageIndex;
     public List<ImageDto> Images { get; set; } = new();
     private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
 
+    private DateTime? _lastImageTimestamp;
     private Timer? _timer;
     private readonly HashSet<string> _seenImageKeys = new();
+    private int _imageIndex;
     private int _sequenceCounter;
     private bool _wasRunning;
-    
+    private bool _stopped;
+
+    // ── Graph variables ───────────────────────────────────────────────
+    private record InterArrivalPoint(int Seq, double Ms);
+
+    private readonly List<InterArrivalPoint> _interArrivalData = new();
+
+    private record ThroughputPoint(double ElapsedSeconds, double Kbps);
+
+    private readonly List<ThroughputPoint> _throughputData = new();
+
+
     protected override async Task OnInitializedAsync()
     {
         await LoadImages();
@@ -157,19 +208,19 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // Experiment just started
         if (ExperimentRunning && !_wasRunning)
         {
-            Session = new ExperimentDto() { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
-            _seenImageKeys.Clear();
-            _sequenceCounter = 0;
+            Reset();
+            StartPolling();
             await NotifySessionChanged();
         }
 
         // Experiment just stopped
         if (!ExperimentRunning && _wasRunning && Session is not null)
         {
+            _stopped = true;
             Session.EndTime = DateTime.UtcNow;
+            _timer?.Dispose();
             await NotifySessionChanged();
         }
 
@@ -178,20 +229,25 @@
 
     private void StartPolling()
     {
+        _stopped = false;
         _timer = new Timer(async void (_) =>
         {
+            if (_stopped) return;
             await LoadImages();
-
             if (ExperimentRunning && Session is not null)
                 CollectMetrics();
-
             await InvokeAsync(StateHasChanged);
         }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
     }
 
     private async Task LoadImages()
     {
-        Images = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
+        var fetched = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
+
+        Images = ExperimentStartUtc.HasValue && Session is not null
+            ? fetched.Where(img => img.DeviceTimestamp >= Session.StartTime).ToList()
+            : fetched;
+
         if (_imageIndex >= Images.Count)
             _imageIndex = Math.Max(0, Images.Count - 1);
     }
@@ -207,7 +263,14 @@
             var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
             if (!_seenImageKeys.Add(key)) continue;
 
-            Session.Entries.Add(new ImageDto()
+            if (_lastImageTimestamp.HasValue)
+            {
+                var ms = (img.DeviceTimestamp - _lastImageTimestamp.Value).TotalMilliseconds;
+                _interArrivalData.Add(new InterArrivalPoint(_sequenceCounter, ms));
+            }
+
+            _lastImageTimestamp = img.DeviceTimestamp;
+            Session.Entries.Add(new ImageDto
             {
                 TransmitterId = img.TransmitterId,
                 DeviceTimestamp = img.DeviceTimestamp,
@@ -216,6 +279,13 @@
                 HopCount = img.HopCount,
                 SequenceNumber = _sequenceCounter++,
             });
+
+            var elapsed = (DateTime.UtcNow - Session.StartTime).TotalSeconds;
+            if (elapsed > 0)
+            {
+                var kbps = Session.TotalBytes * 8.0 / 1000 / elapsed;
+                _throughputData.Add(new ThroughputPoint(Math.Round(elapsed, 1), Math.Round(kbps, 2)));
+            }
         }
     }
 
@@ -228,12 +298,29 @@
     private static string FormatBytes(long bytes) => bytes switch
     {
         >= 1_048_576 => $"{bytes / 1_048_576.0:F1} MB",
-        >= 1024      => $"{bytes / 1024.0:F1} KB",
-        _            => $"{bytes} B"
+        >= 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes} B"
     };
+
+    /// <summary>
+    /// Resets everything for a new experiment.
+    /// </summary>
+    private void Reset()
+    {
+        Images.Clear();
+        _imageIndex = 0;
+        Session = new ExperimentDto() { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
+        _seenImageKeys.Clear();
+        _sequenceCounter = 0;
+        _interArrivalData.Clear();
+        _lastImageTimestamp = null;
+        _throughputData.Clear();
+    }
+
 
     public void Dispose()
     {
         _timer?.Dispose();
     }
+
 }

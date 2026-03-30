@@ -1,0 +1,14 @@
+﻿@inject DialogService DialogService
+
+<RadzenStack Gap="1rem" Style="padding: 1rem;">
+    <RadzenText>Enter duration in seconds:</RadzenText>
+    <RadzenNumeric TValue="int" @bind-Value="_seconds" Min="1" Style="width: 100%;" />
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(null))" />
+        <RadzenButton Text="Start" ButtonStyle="ButtonStyle.Info" Click="@(() => DialogService.Close(_seconds))" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    private int _seconds;
+}

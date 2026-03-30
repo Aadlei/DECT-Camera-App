@@ -6,8 +6,10 @@
 @using DECT_Web.Services
 @using Radzen.Blazor.Markdown
 @inject MongoDbServices MongoDbService
+@inject DialogService DialogService
 @inject IJSRuntime JS
 
+<RadzenDialog />
 @if (TransmitterIds?.Count > 0)
 {
     <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
@@ -22,7 +24,19 @@
                  Gap="0.5rem" class="rz-my-5">
         @if (!_experimentRunning)
         {
-            <RadzenButton ButtonStyle="ButtonStyle.Info" Click="InitiateExperimentAsync" Text="START" />
+            <RadzenSplitButton ButtonStyle="ButtonStyle.Info"
+                               Text="START"
+                               Click="StartWithDuration"
+                               AlwaysOpenPopup="false">
+                <ChildContent>
+                    <RadzenSplitButtonItem Text="1 minute" Value="60" />
+                    <RadzenSplitButtonItem Text="5 minutes" Value="300" />
+                    <RadzenSplitButtonItem Text="10 minutes" Value="600" />
+                    <RadzenSplitButtonItem Text="1 hour" Value="3600" />
+                    <RadzenSplitButtonItem Text="Custom..." Value="custom" />
+                    <RadzenSplitButtonItem Text="Run indefinitely" Value="0" />
+                </ChildContent>
+            </RadzenSplitButton>
         }
         else
         {
@@ -44,17 +58,50 @@
         }
     </RadzenStack>
 }
+<script>
+    window.downloadFile = (fileName, base64) => {
+        const link = document.createElement('a');
+        link.href = 'data:text/csv;base64,' + base64;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
+    window.exportZip = async (fileName, csvBase64, chartIds) => {
+        const zip = new JSZip();
+        zip.file("experiment.csv", csvBase64, { base64: true });
+
+        for (const id of chartIds) {
+            const el = document.getElementById(id);
+            if (el) {
+                const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+                const pngData = canvas.toDataURL('image/png').split(',')[1];
+                zip.file(`${id}.png`, pngData, { base64: true });
+            }
+        }
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+</script>
 
 @code {
     private List<int>? TransmitterIds { get; set; }
     private readonly Stopwatch _stopwatch = new();
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
-
+    private bool _showCustomInput;
     private bool _experimentRunning;
     private DateTime? _experimentStartUtc;
+    private TimeSpan? _experimentDuration;
 
+    private int _customSeconds;
     // Collect each component's session for aggregated CSV export
     private readonly Dictionary<int, ExperimentDto?> _sessions = new();
 
@@ -64,6 +111,22 @@
     protected override async Task OnInitializedAsync()
     {
         TransmitterIds = await MongoDbService.GetAllTransmittersAsync();
+        Console.WriteLine($"Initialized Home page with {TransmitterIds?.Count} transmitters");
+    }
+    
+    private async Task StartWithDuration(RadzenSplitButtonItem? item)
+    {
+        var value = item?.Value?.ToString();
+
+        if (value == "custom")
+        {
+            await ShowCustomDurationDialog();
+            return;
+        }
+
+        var seconds = value is not null ? int.Parse(value) : 0;
+        _experimentDuration = seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
+        await InitiateExperimentAsync();
     }
     
     // ── Start ───────────────────────────────────────────────
@@ -84,7 +147,14 @@
             try
             {
                 while (await _timer.WaitForNextTickAsync(_cts.Token))
+                {
+                    if (_experimentDuration.HasValue && _stopwatch.Elapsed >= _experimentDuration.Value)
+                    {
+                        await InvokeAsync(StopExperimentAsync);
+                        break;
+                    }
                     await InvokeAsync(StateHasChanged);
+                }
             }
             catch (OperationCanceledException) { }
         });
@@ -97,6 +167,17 @@
         _stopwatch.Stop();
         _cts?.Cancel();
         _timer?.Dispose();
+        StateHasChanged();
+    }
+    
+    private async Task ShowCustomDurationDialog()
+    {
+        var result = await DialogService.OpenAsync<CustomInputDialog>("Custom Duration");
+        if (result is int seconds && seconds > 0)
+        {
+            _experimentDuration = TimeSpan.FromSeconds(seconds);
+            await InitiateExperimentAsync();
+        }
     }
     
     private void OnSessionChanged(int txId, ExperimentDto? session)
@@ -119,7 +200,6 @@
 
         var sb = new StringBuilder();
         sb.AppendLine("Seq,TransmitterId,DeviceTimestampUtc,ReceivedAtUtc,SizeBytes,HopCount");
-
         foreach (var e in allEntries)
         {
             sb.AppendLine(string.Join(",",
@@ -130,18 +210,22 @@
                 e.SizeBytes,
                 e.HopCount));
         }
-
         sb.AppendLine();
         sb.AppendLine($"# Experiment Duration (s),{elapsed.TotalSeconds:F2}");
         sb.AppendLine($"# Total Images,{allEntries.Count}");
         sb.AppendLine($"# Total Bytes,{totalBytes}");
         sb.AppendLine($"# Throughput (kbps),{(elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / 1000 / elapsed.TotalSeconds : 0):F2}");
 
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        var base64 = Convert.ToBase64String(bytes);
-        var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.csv";
+        var csvBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(sb.ToString()));
 
-        await JS.InvokeVoidAsync("downloadFile", fileName, base64);
+        var chartIds = TransmitterIds!.SelectMany(id => new[]
+        {
+            $"interarrival-chart-{id}",
+            $"throughput-chart-{id}"
+        }).ToList();
+
+        var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.zip";
+        await JS.InvokeVoidAsync("exportZip", fileName, csvBase64, chartIds);
     }
 
 }
