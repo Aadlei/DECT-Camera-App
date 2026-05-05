@@ -16,7 +16,10 @@ public class ExperimentDto
     public long TotalBytes => Entries.Sum(e => e.SizeBytes);
     
     public double ThroughputBytesPerSecond => ElapsedTime.TotalSeconds > 0 ? TotalBytes / ElapsedTime.TotalSeconds : 0;
-    
+    public double AvgEndToEndDelayMs  => Entries.Count > 0 ? Entries.Average(e => e.EndToEndDelayMs) : 0;
+    public int    DroppedPackets      { get; set; }
+    public double PacketLossPercent   => _totalExpected > 0 ? DroppedPackets * 100.0 / _totalExpected : 0;
+    private int _totalExpected;
     public double AvgInterArrivalMs
     {
         get
@@ -32,7 +35,7 @@ public class ExperimentDto
     public double AvgHopCount =>
         Entries.Count > 0 ? Entries.Average(e => e.HopCount) : 0;
  
-    public Dictionary<int, TransmitterStatsDto> PerTransmitter =>
+    public Dictionary<string, TransmitterStatsDto> PerTransmitter =>
         Entries
             .GroupBy(e => e.TransmitterId)
             .ToDictionary(g => g.Key, g => new TransmitterStatsDto

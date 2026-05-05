@@ -2,7 +2,7 @@
 
 public class ImageDto
 {
-    public int TransmitterId { get; set; }
+    public string TransmitterId { get; set; }
     public int HopCount { get; set; }
     public DateTime DeviceTimestamp { get; set; }
     public DateTime ReceivedAt { get; set; }
@@ -11,4 +11,7 @@ public class ImageDto
     public int ImageCount { get; set; }
     public int SequenceNumber { get; set; }
     public int SizeBytes { get; set; }
+    public List<string> DevicesVisited { get; set; } = new();
+    public List<long>   PerLinkDelayMs { get; set; } = new();
+    public long EndToEndDelayMs => PerLinkDelayMs.Skip(1).Sum(); // index 0 is always 0
 }

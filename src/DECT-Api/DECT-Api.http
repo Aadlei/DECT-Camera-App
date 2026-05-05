@@ -1,4 +1,4 @@
-@DECT_Api_HostAddress = https://localhost:5000
+@DECT_Api_HostAddress = https://localhost:5001
 
 GET {{DECT_Api_HostAddress}}/api/mongodb/latest
 Accept: application/json
@@ -10,7 +10,12 @@ Accept: application/json
 
 ###
 
-GET {{DECT_Api_HostAddress}}/api/mongodb/latest/1337
+GET {{DECT_Api_HostAddress}}/api/mongodb/latest/20
+Accept: application/json
+
+###
+
+GET {{DECT_Api_HostAddress}}/api/mongodb/latest/0xaabbccdd/20
 Accept: application/json
 
 ###

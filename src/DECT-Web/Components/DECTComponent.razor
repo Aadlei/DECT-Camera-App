@@ -1,4 +1,5 @@
-﻿@using DECT_Shared.Models
+﻿@using System.Text
+@using DECT_Shared.Models
 @using DECT_Web.Services
 @using Radzen.Blazor.Markdown
 @implements IDisposable
@@ -80,6 +81,12 @@
                                 <RadzenColumn Size="6">
                                     <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")"/>
                                 </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Avg E2E Latency" Value="@($"{Session.AvgEndToEndDelayMs:F0} ms")"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Packet Loss" Value="@($"{Session.PacketLossPercent:F1} %")"/>
+                                </RadzenColumn>
                             </RadzenRow>
                         </RadzenStack>
                     </ChildContent>
@@ -123,6 +130,31 @@
                     }
                 </ChildContent>
             </RadzenPanel>
+            
+            @* ── Topology ── *@
+@if (Image?.DevicesVisited?.Count > 1)
+{
+    <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-10">
+        <HeaderTemplate>
+            <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                <RadzenIcon Icon="device_hub" class="rz-me-1"/>
+                <b>Last Path</b>
+            </RadzenText>
+        </HeaderTemplate>
+        <ChildContent>
+            <div style="overflow-x: auto; padding: 1rem;">
+                @{ var nodes = Image.DevicesVisited; var delays = Image.PerLinkDelayMs; }
+                @{
+                    int nodeW = 110, nodeH = 44, gap = 80;
+                    int total = nodes.Count;
+                    int svgW   = total * nodeW + (total - 1) * gap + 20;
+                }
+                @((MarkupString)BuildTopologySvg())
+            </div>
+        </ChildContent>
+    </RadzenPanel>
+}
+            
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
@@ -165,7 +197,7 @@
 
 
 @code {
-    [Parameter] public int TransmitterId { get; set; }
+    [Parameter] public string TransmitterId { get; set; }
 
     // Experiment parameters
     [Parameter] public bool ExperimentRunning { get; set; }
@@ -189,7 +221,15 @@
     private int _sequenceCounter;
     private bool _wasRunning;
     private bool _stopped;
+    private record LinkDelayPoint(int Seq, double Ms);
+    private readonly Dictionary<int, List<LinkDelayPoint>> _perLinkData = new();
 
+    private record E2EPoint(int Seq, double Ms);
+    private readonly List<E2EPoint> _e2eData = new();
+
+    // Packet loss tracking
+    private int _lastSeenSeqNum = -1;
+    private int _totalExpected  = 0;
     // ── Graph variables ───────────────────────────────────────────────
     private record InterArrivalPoint(int Seq, double Ms);
 
@@ -286,6 +326,33 @@
                 var kbps = Session.TotalBytes * 8.0 / 1000 / elapsed;
                 _throughputData.Add(new ThroughputPoint(Math.Round(elapsed, 1), Math.Round(kbps, 2)));
             }
+            // Per-link delays
+            if (img.PerLinkDelayMs?.Count > 1)
+            {
+                for (int li = 1; li < img.PerLinkDelayMs.Count; li++)
+                {
+                    if (!_perLinkData.ContainsKey(li))
+                        _perLinkData[li] = new();
+                    _perLinkData[li].Add(new LinkDelayPoint(_sequenceCounter, img.PerLinkDelayMs[li]));
+                }
+                _e2eData.Add(new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
+            }
+
+            // Packet loss — detect gaps in PT sequence numbers
+            if (img.SequenceNumber > 0) // SequenceNumber here = the PT seq_num from metadata
+            {
+                if (_lastSeenSeqNum >= 0)
+                {
+                    int gap = img.SequenceNumber - _lastSeenSeqNum - 1;
+                    if (gap > 0)
+                    {
+                        Session.DroppedPackets += gap;
+                        _totalExpected += gap;
+                    }
+                }
+                _lastSeenSeqNum = img.SequenceNumber;
+                _totalExpected++;
+            }
         }
     }
 
@@ -302,6 +369,49 @@
         _ => $"{bytes} B"
     };
 
+    private string BuildTopologySvg()
+    {
+        if (Image?.DevicesVisited == null || Image.DevicesVisited.Count < 2)
+            return string.Empty;
+
+        var nodes  = Image.DevicesVisited;
+        var delays = Image.PerLinkDelayMs;
+        int total  = nodes.Count;
+        int nodeW  = 110, nodeH = 44, gap = 80;
+        int svgW   = total * nodeW + (total - 1) * gap + 20;
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg viewBox=\"0 0 {svgW} 90\" style=\"width:100%; min-width:{svgW}px; height:90px;\" xmlns=\"http://www.w3.org/2000/svg\">");
+        sb.Append($"<defs><marker id=\"arr-{TransmitterId}\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\">");
+        sb.Append("<path d=\"M0,0 L0,6 L8,3 z\" fill=\"#888\"/></marker></defs>");
+
+        for (int i = 0; i < total; i++)
+        {
+            int x  = 10 + i * (nodeW + gap);
+            int cx = x + nodeW / 2;
+            string label = GetDeviceLabel(i, total);
+
+            sb.Append($"<rect x=\"{x}\" y=\"25\" width=\"{nodeW}\" height=\"{nodeH}\" rx=\"8\" fill=\"#3d8bff\" fill-opacity=\"0.85\"/>");
+            sb.Append($"<text x=\"{cx}\" y=\"44\" text-anchor=\"middle\" fill=\"white\" font-size=\"11\" font-weight=\"bold\">{label}</text>");
+            sb.Append($"<text x=\"{cx}\" y=\"58\" text-anchor=\"middle\" fill=\"white\" font-size=\"9\" opacity=\"0.75\">{nodes[i]}</text>");
+
+            if (i < total - 1)
+            {
+                int arrowX0 = x + nodeW;
+                int arrowX1 = x + nodeW + gap;
+                int midX    = (arrowX0 + arrowX1) / 2;
+                string delayLabel = (i + 1 < delays.Count && delays[i + 1] > 0)
+                    ? $"{delays[i + 1]} ms" : "—";
+
+                sb.Append($"<line x1=\"{arrowX0}\" y1=\"47\" x2=\"{arrowX1 - 4}\" y2=\"47\" stroke=\"#888\" stroke-width=\"2\" marker-end=\"url(#arr-{TransmitterId})\"/>");
+                sb.Append($"<text x=\"{midX}\" y=\"20\" text-anchor=\"middle\" fill=\"#555\" font-size=\"10\">{delayLabel}</text>");
+            }
+        }
+
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+    
     /// <summary>
     /// Resets everything for a new experiment.
     /// </summary>
@@ -315,9 +425,18 @@
         _interArrivalData.Clear();
         _lastImageTimestamp = null;
         _throughputData.Clear();
+        _perLinkData.Clear();
+        _e2eData.Clear();
+        _lastSeenSeqNum = -1;
+        _totalExpected  = 0;
     }
 
-
+    private static string GetDeviceLabel(int index, int total) => (index, total) switch
+    {
+        (0, _)                    => "Edge PT",
+        _ when index == total - 1 => "Sink FT",
+        _                         => $"Relay {index}",
+    };
     public void Dispose()
     {
         _timer?.Dispose();

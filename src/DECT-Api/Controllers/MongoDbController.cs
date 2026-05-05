@@ -26,11 +26,11 @@ public class MongoDbController(MongoDbService mongo) : ControllerBase
     }
     
     [HttpGet("latest/{txId}")]
-    public async Task<ActionResult<List<ImageDto>>> GetLatestImageDataByIdAsync(int txId) => 
+    public async Task<ActionResult<List<ImageDto>>> GetLatestImageDataByIdAsync(string txId) => 
         Ok(await mongo.GetLatestImageDataByIdAsync(txId));
 
     [HttpGet("latest/{txId}/{amount}")]
-    public async Task<ActionResult<List<ImageDto>>> GetLatestImageDataByAmountAsync(int amount, int txId) =>
+    public async Task<ActionResult<List<ImageDto>>> GetLatestImageDataByAmountAsync(int amount, string txId) =>
         Ok(await mongo.GetLatestImagesByIdAsync(txId, amount));
     
     [HttpGet("all-tx-ids")] 

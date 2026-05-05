@@ -33,7 +33,7 @@ public class MongoDbService
         return MapToDto(doc);
     }
 
-    public async Task<ImageDto?> GetLatestImageDataByIdAsync(int txId)
+    public async Task<ImageDto?> GetLatestImageDataByIdAsync(string txId)
     {
         var filter = Builders<BsonDocument>.Filter.Eq("transmitter_id", txId);
         var doc = await _images
@@ -43,7 +43,7 @@ public class MongoDbService
         return doc is null ? null : MapToDto(doc);
     }
 
-    public async Task<List<ImageDto>> GetLatestImagesByIdAsync(int txId, int amount)
+    public async Task<List<ImageDto>> GetLatestImagesByIdAsync(string txId, int amount)
     {
         var filter = Builders<BsonDocument>.Filter.Eq("transmitter_id", txId);
         var doc = await _images
@@ -55,14 +55,19 @@ public class MongoDbService
     }
 
     // Get all unique transmitters, for example 1337, 4567..
-    public async Task<List<int>> GetAllUniqueTransmittersAsync()
+    public async Task<List<string>> GetAllUniqueTransmittersAsync()
     {
-        var result = await _images.DistinctAsync<int>("transmitter_id", FilterDefinition<BsonDocument>.Empty);
+        var filter = Builders<BsonDocument>.Filter.And(
+            Builders<BsonDocument>.Filter.Exists("transmitter_id"),
+            Builders<BsonDocument>.Filter.Ne("transmitter_id", BsonNull.Value)
+        );
+
+        var result = await _images.DistinctAsync<string>("transmitter_id", filter);
         return await result.ToListAsync();
     }
 
     // Get all images for a specific transmitter
-    public async Task<List<ImageDto>> GetByTransmitterAsync(int txId)
+    public async Task<List<ImageDto>> GetByTransmitterAsync(string txId)
     {
         var filter = Builders<BsonDocument>.Filter.Eq("transmitter_id", txId);
         var docs = await _images
@@ -83,9 +88,9 @@ public class MongoDbService
 
     private static ImageDto MapToDto(BsonDocument doc) => new()
     {
-        TransmitterId = doc.GetValue("transmitter_id", 0).ToInt32(),
+        TransmitterId = doc.GetValue("transmitter_id", "unknown").AsString,
         Image = doc.GetValue("image_data").AsByteArray,
-        HopCount = doc.GetValue("hop_count", 0).ToInt32(),
+        HopCount = doc.GetValue("num_links", 0).ToInt32(),
         DeviceTimestamp = doc["timestamp"].ToUniversalTime(),
         SizeBytes = doc["size_bytes"].ToInt32(),
     };

@@ -51,7 +51,7 @@
                  JustifyContent="JustifyContent.Center" Gap="1rem">
         @foreach (var id in TransmitterIds)
         {
-            <DECTComponent TransmitterId="id"
+            <DECTComponent TransmitterId="@id"
                            ExperimentRunning="_experimentRunning"
                            ExperimentStartUtc="_experimentStartUtc"
                            SessionChanged="s => OnSessionChanged(id, s)" />
@@ -92,7 +92,7 @@
 </script>
 
 @code {
-    private List<int>? TransmitterIds { get; set; }
+    private List<string>? TransmitterIds { get; set; }
     private readonly Stopwatch _stopwatch = new();
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
@@ -103,7 +103,7 @@
 
     private int _customSeconds;
     // Collect each component's session for aggregated CSV export
-    private readonly Dictionary<int, ExperimentDto?> _sessions = new();
+    private readonly Dictionary<string, ExperimentDto?> _sessions = new();
 
     private bool IsExportReady =>
         !_experimentRunning && _sessions.Values.Any(s => s is { TotalImages: > 0 });
@@ -180,7 +180,7 @@
         }
     }
     
-    private void OnSessionChanged(int txId, ExperimentDto? session)
+    private void OnSessionChanged(string txId, ExperimentDto? session)
     {
         _sessions[txId] = session;
     }

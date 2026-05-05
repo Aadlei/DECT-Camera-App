@@ -30,7 +30,7 @@ public class MongoDbServices(HttpClient client)
     /// </summary>
     /// <param name="txId"></param>
     /// <returns></returns>
-    public async Task<ImageDto> GetLatestImageDataByIdAsync(int txId)
+    public async Task<ImageDto> GetLatestImageDataByIdAsync(string txId)
     {
         try
         {
@@ -44,7 +44,7 @@ public class MongoDbServices(HttpClient client)
         return new();
     }
 
-    public async Task<List<ImageDto>> GetLastXImagesAsync(int txId, int amount)
+    public async Task<List<ImageDto>> GetLastXImagesAsync(string txId, int amount)
     {
         try
         {
@@ -61,11 +61,11 @@ public class MongoDbServices(HttpClient client)
     /// Returns all transmitter ids that are unique.
     /// </summary>
     /// <returns></returns>
-    public async Task<List<int>> GetAllTransmittersAsync()
+    public async Task<List<string>> GetAllTransmittersAsync()
     {
         try
         {
-            return await client.GetFromJsonAsync<List<int>>("api/mongodb/all-tx-ids") ?? new();
+            return await client.GetFromJsonAsync<List<string>>("api/mongodb/all-tx-ids") ?? new();
         }
         catch (Exception ex)
         {
