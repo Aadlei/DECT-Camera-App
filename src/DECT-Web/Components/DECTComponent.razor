@@ -50,7 +50,7 @@
                 </RadzenStack>
             </RadzenStack>
 
-            @* ── Metrics Panel (visible during / after experiment) ── *@
+            @* ── Metrics Panel ── *@
             @if (Session is not null)
             {
                 <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-5">
@@ -72,7 +72,7 @@
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
                                     <MetricTile Label="Throughput"
-                                                Value="@($"{Session.ThroughputBytesPerSecond:F1} kbps")"/>
+                                                Value="@($"{Session.ThroughputBytesPerSecond * 8 / 1000:F0} kbps")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
                                     <MetricTile Label="Avg Inter-Arrival"
@@ -82,10 +82,16 @@
                                     <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Avg E2E Latency" Value="@($"{Session.AvgEndToEndDelayMs:F0} ms")"/>
+                                    <MetricTile Label="Avg E2E Latency"
+                                                Value="@($"{Session.AvgEndToEndDelayMs:F0} ms")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Packet Loss" Value="@($"{Session.PacketLossPercent:F1} %")"/>
+                                    <MetricTile Label="Packet Loss"
+                                                Value="@($"{Session.PacketLossPercent:F1} %")"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <MetricTile Label="Avg RSSI"
+                                                Value="@($"{Session.AvgRssiDbm:F1} dBm")"/>
                                 </RadzenColumn>
                             </RadzenRow>
                         </RadzenStack>
@@ -93,7 +99,7 @@
                 </RadzenPanel>
             }
 
-            @* ── Graphs ── *@
+            @* ── Inter-Arrival Time ── *@
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
@@ -109,16 +115,17 @@
                                 <RadzenLineSeries Data="_interArrivalData"
                                                   CategoryProperty="Seq"
                                                   ValueProperty="Ms"
-                                                  Title="ms"
-                                                  Smooth="false">
-                                    <RadzenMarkers MarkerType="MarkerType.None"/>
+                                                  Title="Inter-arrival"
+                                                  Smooth="true">
+                                    <RadzenMarkers MarkerType="MarkerType.Circle" Size="4"/>
                                 </RadzenLineSeries>
                                 <RadzenCategoryAxis>
                                     <RadzenAxisTitle Text="image #"/>
                                 </RadzenCategoryAxis>
-                                <RadzenValueAxis>
+                                <RadzenValueAxis FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="ms"/>
                                 </RadzenValueAxis>
+                                <RadzenChartTooltipOptions Shared="false"/>
                             </RadzenChart>
                         </div>
                     }
@@ -130,31 +137,26 @@
                     }
                 </ChildContent>
             </RadzenPanel>
-            
+
             @* ── Topology ── *@
-@if (Image?.DevicesVisited?.Count > 1)
-{
-    <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-10">
-        <HeaderTemplate>
-            <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
-                <RadzenIcon Icon="device_hub" class="rz-me-1"/>
-                <b>Last Path</b>
-            </RadzenText>
-        </HeaderTemplate>
-        <ChildContent>
-            <div style="overflow-x: auto; padding: 1rem;">
-                @{ var nodes = Image.DevicesVisited; var delays = Image.PerLinkDelayMs; }
-                @{
-                    int nodeW = 110, nodeH = 44, gap = 80;
-                    int total = nodes.Count;
-                    int svgW   = total * nodeW + (total - 1) * gap + 20;
-                }
-                @((MarkupString)BuildTopologySvg())
-            </div>
-        </ChildContent>
-    </RadzenPanel>
-}
-            
+            @if (Image?.DevicesVisited?.Count > 1)
+            {
+                <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-10">
+                    <HeaderTemplate>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                            <RadzenIcon Icon="device_hub" class="rz-me-1"/>
+                            <b>Last Path</b>
+                        </RadzenText>
+                    </HeaderTemplate>
+                    <ChildContent>
+                        <div style="overflow-x: auto; padding: 1rem;">
+                            @((MarkupString)BuildTopologySvg())
+                        </div>
+                    </ChildContent>
+                </RadzenPanel>
+            }
+
+            @* ── Throughput ── *@
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
@@ -166,21 +168,22 @@
                     @if (_throughputData.Count > 1)
                     {
                         <div id="@($"throughput-chart-{TransmitterId}")">
-                        <RadzenChart Style="height: 250px;">
-                            <RadzenLineSeries Data="_throughputData"
-                                              CategoryProperty="ElapsedSeconds"
-                                              ValueProperty="Kbps"
-                                              Title="kbps"
-                                              Smooth="true">
-                                <RadzenMarkers MarkerType="MarkerType.None"/>
-                            </RadzenLineSeries>
-                            <RadzenCategoryAxis>
-                                <RadzenAxisTitle Text="Elapsed (s)"/>
-                            </RadzenCategoryAxis>
-                            <RadzenValueAxis>
-                                <RadzenAxisTitle Text="kbps"/>
-                            </RadzenValueAxis>
-                        </RadzenChart>
+                            <RadzenChart Style="height: 280px;">
+                                <RadzenAreaSeries Data="_throughputData"
+                                                  CategoryProperty="ElapsedSeconds"
+                                                  ValueProperty="Kbps"
+                                                  Title="kbps"
+                                                  Smooth="true">
+                                    <RadzenMarkers MarkerType="MarkerType.None"/>
+                                </RadzenAreaSeries>
+                                <RadzenCategoryAxis FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="Elapsed (s)"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="kbps"/>
+                                </RadzenValueAxis>
+                                <RadzenChartTooltipOptions Shared="false"/>
+                            </RadzenChart>
                         </div>
                     }
                     else
@@ -191,6 +194,81 @@
                     }
                 </ChildContent>
             </RadzenPanel>
+
+            @* ── Per-Link Delay ── *@
+            @if (_perLinkData.Count > 0)
+            {
+                <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
+                    <HeaderTemplate>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                            <RadzenIcon Icon="timeline" class="rz-me-1"/>
+                            <b>Per-Link Delay</b>
+                        </RadzenText>
+                    </HeaderTemplate>
+                    <ChildContent>
+                        <div id="@($"linkdelay-chart-{TransmitterId}")">
+                            <RadzenChart Style="height: 280px;">
+                                @foreach (var (linkIdx, points) in _perLinkData.OrderBy(kv => kv.Key))
+                                {
+                                    <RadzenLineSeries Data="points"
+                                                      CategoryProperty="Seq"
+                                                      ValueProperty="Ms"
+                                                      Title="@GetLinkLabel(linkIdx)"
+                                                      Smooth="true">
+                                        <RadzenMarkers MarkerType="MarkerType.None"/>
+                                    </RadzenLineSeries>
+                                }
+                                <RadzenCategoryAxis>
+                                    <RadzenAxisTitle Text="image #"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="ms"/>
+                                </RadzenValueAxis>
+                                <RadzenLegend Position="LegendPosition.Bottom"/>
+                                <RadzenChartTooltipOptions Shared="true"/>
+                            </RadzenChart>
+                        </div>
+                    </ChildContent>
+                </RadzenPanel>
+            }
+
+            @* ── Per-Link RSSI ── *@
+            @if (_perLinkRssiData.Count > 0)
+            {
+                <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
+                    <HeaderTemplate>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                            <RadzenIcon Icon="signal_cellular_alt" class="rz-me-1"/>
+                            <b>Per-Link RSSI</b>
+                        </RadzenText>
+                    </HeaderTemplate>
+                    <ChildContent>
+                        <div id="@($"rssi-chart-{TransmitterId}")">
+                            <RadzenChart Style="height: 280px;">
+                                @foreach (var (linkIdx, points) in _perLinkRssiData.OrderBy(kv => kv.Key))
+                                {
+                                    <RadzenLineSeries Data="points"
+                                                      CategoryProperty="Seq"
+                                                      ValueProperty="Dbm"
+                                                      Title="@GetLinkLabel(linkIdx)"
+                                                      Smooth="true">
+                                        <RadzenMarkers MarkerType="MarkerType.None"/>
+                                    </RadzenLineSeries>
+                                }
+                                <RadzenCategoryAxis>
+                                    <RadzenAxisTitle Text="image #"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="dBm"/>
+                                </RadzenValueAxis>
+                                <RadzenLegend Position="LegendPosition.Bottom"/>
+                                <RadzenChartTooltipOptions Shared="true"/>
+                            </RadzenChart>
+                        </div>
+                    </ChildContent>
+                </RadzenPanel>
+            }
+
         </RadzenCard>
     }
 </RadzenCard>
@@ -198,47 +276,50 @@
 
 @code {
     [Parameter] public string TransmitterId { get; set; }
-
-    // Experiment parameters
     [Parameter] public bool ExperimentRunning { get; set; }
 
     /// <summary>UTC timestamp when the experiment was started. Null = no experiment.</summary>
-    [Parameter]
-    public DateTime? ExperimentStartUtc { get; set; }
+    [Parameter] public DateTime? ExperimentStartUtc { get; set; }
 
     /// <summary>Expose session so parent can aggregate for CSV export.</summary>
-    [Parameter]
-    public EventCallback<ExperimentDto?> SessionChanged { get; set; }
+    [Parameter] public EventCallback<ExperimentDto?> SessionChanged { get; set; }
 
-    public ExperimentDto? Session { get; private set; }
-    public List<ImageDto> Images { get; set; } = new();
+    public ExperimentDto?  Session { get; private set; }
+    public List<ImageDto>  Images  { get; set; } = new();
     private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
 
     private DateTime? _lastImageTimestamp;
-    private Timer? _timer;
+    private CancellationTokenSource? _pollCts;
     private readonly HashSet<string> _seenImageKeys = new();
-    private int _imageIndex;
-    private int _sequenceCounter;
+    private int  _imageIndex;
+    private int  _sequenceCounter;
     private bool _wasRunning;
-    private bool _stopped;
+
+    /* Radzen re-renders the entire chart on every StateHasChanged, so cap the
+     * number of points to keep render time bounded during long experiments. */
+    private const int MaxChartPoints = 400;
+
+    // ── Graph data ────────────────────────────────────────────────────────
+    private record InterArrivalPoint(int Seq, double Ms);
+    private readonly List<InterArrivalPoint> _interArrivalData = new();
+
+    private record ThroughputPoint(double ElapsedSeconds, double Kbps);
+    private readonly List<ThroughputPoint> _throughputData = new();
+
     private record LinkDelayPoint(int Seq, double Ms);
     private readonly Dictionary<int, List<LinkDelayPoint>> _perLinkData = new();
 
     private record E2EPoint(int Seq, double Ms);
     private readonly List<E2EPoint> _e2eData = new();
 
-    // Packet loss tracking
+    private record RssiPoint(int Seq, double Dbm);
+    private readonly Dictionary<int, List<RssiPoint>> _perLinkRssiData = new();
+
+    // ── Packet loss tracking ──────────────────────────────────────────────
     private int _lastSeenSeqNum = -1;
     private int _totalExpected  = 0;
-    // ── Graph variables ───────────────────────────────────────────────
-    private record InterArrivalPoint(int Seq, double Ms);
 
-    private readonly List<InterArrivalPoint> _interArrivalData = new();
-
-    private record ThroughputPoint(double ElapsedSeconds, double Kbps);
-
-    private readonly List<ThroughputPoint> _throughputData = new();
-
+    // ─────────────────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -255,12 +336,10 @@
             await NotifySessionChanged();
         }
 
-        // Experiment just stopped
         if (!ExperimentRunning && _wasRunning && Session is not null)
         {
-            _stopped = true;
+            _pollCts?.Cancel();
             Session.EndTime = DateTime.UtcNow;
-            _timer?.Dispose();
             await NotifySessionChanged();
         }
 
@@ -269,15 +348,37 @@
 
     private void StartPolling()
     {
-        _stopped = false;
-        _timer = new Timer(async void (_) =>
+        _pollCts?.Cancel();
+        _pollCts = new CancellationTokenSource();
+        _ = PollLoop(_pollCts.Token);
+    }
+
+    private async Task PollLoop(CancellationToken ct)
+    {
+        /* PeriodicTimer never overlaps — it waits for the handler to finish
+         * before scheduling the next tick. This prevents the burst of queued
+         * callbacks that System.Threading.Timer fires when a background tab
+         * becomes active again, which was causing the chart glitching. */
+        using var pt = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+        try
         {
-            if (_stopped) return;
-            await LoadImages();
-            if (ExperimentRunning && Session is not null)
-                CollectMetrics();
-            await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+            while (await pt.WaitForNextTickAsync(ct))
+            {
+                var prevCount = Images.Count;
+                await LoadImages();
+                bool changed = Images.Count != prevCount;
+
+                if (ExperimentRunning && Session is not null)
+                {
+                    CollectMetrics();
+                    changed = true; // always re-render during experiment
+                }
+
+                if (changed)
+                    await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private async Task LoadImages()
@@ -303,43 +404,61 @@
             var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
             if (!_seenImageKeys.Add(key)) continue;
 
+            // ── Inter-arrival ─────────────────────────────────────────────
             if (_lastImageTimestamp.HasValue)
             {
                 var ms = (img.DeviceTimestamp - _lastImageTimestamp.Value).TotalMilliseconds;
-                _interArrivalData.Add(new InterArrivalPoint(_sequenceCounter, ms));
+                AddCapped(_interArrivalData, new InterArrivalPoint(_sequenceCounter, ms));
             }
-
             _lastImageTimestamp = img.DeviceTimestamp;
+
+            // ── Session entry ─────────────────────────────────────────────
             Session.Entries.Add(new ImageDto
             {
-                TransmitterId = img.TransmitterId,
+                TransmitterId   = img.TransmitterId,
                 DeviceTimestamp = img.DeviceTimestamp,
-                ReceivedAt = DateTime.UtcNow,
-                SizeBytes = img.SizeBytes,
-                HopCount = img.HopCount,
-                SequenceNumber = _sequenceCounter++,
+                ReceivedAt      = DateTime.UtcNow,
+                SizeBytes       = img.SizeBytes,
+                HopCount        = img.HopCount,
+                SequenceNumber  = _sequenceCounter++,
+                PerLinkDelayMs  = img.PerLinkDelayMs,
+                PerLinkRssi     = img.PerLinkRssi,
             });
 
+            // ── Throughput ────────────────────────────────────────────────
             var elapsed = (DateTime.UtcNow - Session.StartTime).TotalSeconds;
             if (elapsed > 0)
             {
                 var kbps = Session.TotalBytes * 8.0 / 1000 / elapsed;
-                _throughputData.Add(new ThroughputPoint(Math.Round(elapsed, 1), Math.Round(kbps, 2)));
+                AddCapped(_throughputData, new ThroughputPoint(Math.Round(elapsed, 1), Math.Round(kbps, 0)));
             }
-            // Per-link delays
+
+            // ── Per-link delay ────────────────────────────────────────────
             if (img.PerLinkDelayMs?.Count > 1)
             {
                 for (int li = 1; li < img.PerLinkDelayMs.Count; li++)
                 {
                     if (!_perLinkData.ContainsKey(li))
                         _perLinkData[li] = new();
-                    _perLinkData[li].Add(new LinkDelayPoint(_sequenceCounter, img.PerLinkDelayMs[li]));
+                    AddCapped(_perLinkData[li], new LinkDelayPoint(_sequenceCounter, img.PerLinkDelayMs[li]));
                 }
-                _e2eData.Add(new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
+                AddCapped(_e2eData, new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
             }
 
-            // Packet loss — detect gaps in PT sequence numbers
-            if (img.SequenceNumber > 0) // SequenceNumber here = the PT seq_num from metadata
+            // ── Per-link RSSI ─────────────────────────────────────────────
+            if (img.PerLinkRssi?.Count > 0)
+            {
+                for (int li = 0; li < img.PerLinkRssi.Count; li++)
+                {
+                    if (img.PerLinkRssi[li] == 0) continue;
+                    if (!_perLinkRssiData.ContainsKey(li))
+                        _perLinkRssiData[li] = new();
+                    AddCapped(_perLinkRssiData[li], new RssiPoint(_sequenceCounter, img.PerLinkRssi[li]));
+                }
+            }
+
+            // ── Packet loss ───────────────────────────────────────────────
+            if (img.SequenceNumber > 0)
             {
                 if (_lastSeenSeqNum >= 0)
                 {
@@ -362,26 +481,64 @@
             await SessionChanged.InvokeAsync(Session);
     }
 
+    private void Reset()
+    {
+        Images.Clear();
+        _imageIndex = 0;
+        Session = new ExperimentDto { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
+        _seenImageKeys.Clear();
+        _sequenceCounter = 0;
+        _interArrivalData.Clear();
+        _lastImageTimestamp = null;
+        _throughputData.Clear();
+        _perLinkData.Clear();
+        _e2eData.Clear();
+        _perLinkRssiData.Clear();
+        _lastSeenSeqNum = -1;
+        _totalExpected  = 0;
+    }
+
     private static string FormatBytes(long bytes) => bytes switch
     {
         >= 1_048_576 => $"{bytes / 1_048_576.0:F1} MB",
-        >= 1024 => $"{bytes / 1024.0:F1} KB",
-        _ => $"{bytes} B"
+        >= 1024      => $"{bytes / 1024.0:F1} KB",
+        _            => $"{bytes} B"
     };
+
+    private static string GetDeviceLabel(int index, int total) => (index, total) switch
+    {
+        (0, _)                    => "Edge PT",
+        _ when index == total - 1 => "Sink FT",
+        _                         => $"Relay {index}",
+    };
+
+    private string GetLinkLabel(int linkIdx)
+    {
+        // linkIdx 0 = Edge PT→first relay/sink, 1 = relay→sink, etc.
+        var nodes = Image?.DevicesVisited;
+        if (nodes is null || nodes.Count < 2) return $"Link {linkIdx}";
+        var from = GetDeviceLabel(linkIdx,     nodes.Count);
+        var to   = GetDeviceLabel(linkIdx + 1, nodes.Count);
+        return $"{from} → {to}";
+    }
 
     private string BuildTopologySvg()
     {
         if (Image?.DevicesVisited == null || Image.DevicesVisited.Count < 2)
             return string.Empty;
 
-        var nodes  = Image.DevicesVisited;
+        var nodes = Image.DevicesVisited;
         var delays = Image.PerLinkDelayMs;
+        var rssi   = Image.PerLinkRssi;
         int total  = nodes.Count;
-        int nodeW  = 110, nodeH = 44, gap = 80;
+        int nodeW  = 110, nodeH = 44, gap = 90;
+        int svgH   = 120; // taller to fit delay + rssi labels
         int svgW   = total * nodeW + (total - 1) * gap + 20;
+        int nodeY  = (svgH - nodeH) / 2; // vertically centred
+        int arrowY = nodeY + nodeH / 2;
 
         var sb = new StringBuilder();
-        sb.Append($"<svg viewBox=\"0 0 {svgW} 90\" style=\"width:100%; min-width:{svgW}px; height:90px;\" xmlns=\"http://www.w3.org/2000/svg\">");
+        sb.Append($"<svg viewBox=\"0 0 {svgW} {svgH}\" style=\"width:100%; min-width:{svgW}px; height:{svgH}px;\" xmlns=\"http://www.w3.org/2000/svg\">");
         sb.Append($"<defs><marker id=\"arr-{TransmitterId}\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\">");
         sb.Append("<path d=\"M0,0 L0,6 L8,3 z\" fill=\"#888\"/></marker></defs>");
 
@@ -391,55 +548,45 @@
             int cx = x + nodeW / 2;
             string label = GetDeviceLabel(i, total);
 
-            sb.Append($"<rect x=\"{x}\" y=\"25\" width=\"{nodeW}\" height=\"{nodeH}\" rx=\"8\" fill=\"#3d8bff\" fill-opacity=\"0.85\"/>");
-            sb.Append($"<text x=\"{cx}\" y=\"44\" text-anchor=\"middle\" fill=\"white\" font-size=\"11\" font-weight=\"bold\">{label}</text>");
-            sb.Append($"<text x=\"{cx}\" y=\"58\" text-anchor=\"middle\" fill=\"white\" font-size=\"9\" opacity=\"0.75\">{nodes[i]}</text>");
+            sb.Append($"<rect x=\"{x}\" y=\"{nodeY}\" width=\"{nodeW}\" height=\"{nodeH}\" rx=\"8\" fill=\"#3d8bff\" fill-opacity=\"0.85\"/>");
+            sb.Append($"<text x=\"{cx}\" y=\"{nodeY + 19}\" text-anchor=\"middle\" fill=\"white\" font-size=\"11\" font-weight=\"bold\">{label}</text>");
+            sb.Append($"<text x=\"{cx}\" y=\"{nodeY + 33}\" text-anchor=\"middle\" fill=\"white\" font-size=\"9\" opacity=\"0.75\">{nodes[i]}</text>");
 
             if (i < total - 1)
             {
                 int arrowX0 = x + nodeW;
                 int arrowX1 = x + nodeW + gap;
                 int midX    = (arrowX0 + arrowX1) / 2;
+
+                // Delay above arrow
                 string delayLabel = (i + 1 < delays.Count && delays[i + 1] > 0)
                     ? $"{delays[i + 1]} ms" : "—";
+                // RSSI below arrow
+                string rssiLabel = (rssi is not null && i + 1 < rssi.Count && rssi[i + 1] != 0)
+                    ? $"{rssi[i + 1]} dBm" : "—";
 
-                sb.Append($"<line x1=\"{arrowX0}\" y1=\"47\" x2=\"{arrowX1 - 4}\" y2=\"47\" stroke=\"#888\" stroke-width=\"2\" marker-end=\"url(#arr-{TransmitterId})\"/>");
-                sb.Append($"<text x=\"{midX}\" y=\"20\" text-anchor=\"middle\" fill=\"#555\" font-size=\"10\">{delayLabel}</text>");
+                sb.Append($"<line x1=\"{arrowX0}\" y1=\"{arrowY}\" x2=\"{arrowX1 - 4}\" y2=\"{arrowY}\" stroke=\"#888\" stroke-width=\"2\" marker-end=\"url(#arr-{TransmitterId})\"/>");
+                sb.Append($"<text x=\"{midX}\" y=\"{arrowY - 8}\" text-anchor=\"middle\" fill=\"#555\" font-size=\"10\">{delayLabel}</text>");
+                sb.Append($"<text x=\"{midX}\" y=\"{arrowY + 18}\" text-anchor=\"middle\" fill=\"#c0392b\" font-size=\"10\">{rssiLabel}</text>");
             }
         }
 
         sb.Append("</svg>");
         return sb.ToString();
     }
-    
-    /// <summary>
-    /// Resets everything for a new experiment.
-    /// </summary>
-    private void Reset()
+
+    /* Removes the oldest point when the list is full, keeping chart render
+     * cost bounded regardless of experiment duration. */
+    private static void AddCapped<T>(List<T> list, T item)
     {
-        Images.Clear();
-        _imageIndex = 0;
-        Session = new ExperimentDto() { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
-        _seenImageKeys.Clear();
-        _sequenceCounter = 0;
-        _interArrivalData.Clear();
-        _lastImageTimestamp = null;
-        _throughputData.Clear();
-        _perLinkData.Clear();
-        _e2eData.Clear();
-        _lastSeenSeqNum = -1;
-        _totalExpected  = 0;
+        if (list.Count >= MaxChartPoints)
+            list.RemoveAt(0);
+        list.Add(item);
     }
 
-    private static string GetDeviceLabel(int index, int total) => (index, total) switch
-    {
-        (0, _)                    => "Edge PT",
-        _ when index == total - 1 => "Sink FT",
-        _                         => $"Relay {index}",
-    };
     public void Dispose()
     {
-        _timer?.Dispose();
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
     }
-
 }

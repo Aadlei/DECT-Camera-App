@@ -14,4 +14,5 @@ public class ImageDto
     public List<string> DevicesVisited { get; set; } = new();
     public List<long>   PerLinkDelayMs { get; set; } = new();
     public long EndToEndDelayMs => PerLinkDelayMs.Skip(1).Sum(); // index 0 is always 0
+    public List<int> PerLinkRssi { get; set; } = new();
 }

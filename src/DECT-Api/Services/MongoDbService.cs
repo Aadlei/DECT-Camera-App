@@ -88,10 +88,29 @@ public class MongoDbService
 
     private static ImageDto MapToDto(BsonDocument doc) => new()
     {
-        TransmitterId = doc.GetValue("transmitter_id", "unknown").AsString,
-        Image = doc.GetValue("image_data").AsByteArray,
-        HopCount = doc.GetValue("num_links", 0).ToInt32(),
+        TransmitterId  = doc.GetValue("transmitter_id", "unknown").AsString,
+        Image          = doc.GetValue("image_data").AsByteArray,
+        HopCount       = doc.GetValue("num_links", 0).ToInt32(),
         DeviceTimestamp = doc["timestamp"].ToUniversalTime(),
-        SizeBytes = doc["size_bytes"].ToInt32(),
+        SizeBytes      = doc["size_bytes"].ToInt32(),
+
+        DevicesVisited = doc.Contains("devices_visited")
+            ? doc["devices_visited"].AsBsonArray
+                .Select(v => $"0x{v.ToInt64():x8}")
+                .ToList()
+            : new List<string>(),
+
+        PerLinkDelayMs = doc.Contains("per_link_delay")
+            ? doc["per_link_delay"].AsBsonArray
+                .Select(v => v.ToInt64())
+                .ToList()
+            : new List<long>(),
+        
+        PerLinkRssi = doc.Contains("per_link_rssi")
+            ? doc["per_link_rssi"].AsBsonArray
+                .Select(v => v.ToInt32())
+                .ToList()
+            : new List<int>(),
+
     };
 }

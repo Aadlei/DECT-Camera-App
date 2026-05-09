@@ -20,6 +20,10 @@ public class ExperimentDto
     public int    DroppedPackets      { get; set; }
     public double PacketLossPercent   => _totalExpected > 0 ? DroppedPackets * 100.0 / _totalExpected : 0;
     private int _totalExpected;
+    
+    /// <summary>
+    /// Average inter-arrival across all hops 
+    /// </summary>
     public double AvgInterArrivalMs
     {
         get
@@ -32,6 +36,23 @@ public class ExperimentDto
             return deltas.Count > 0 ? deltas.Average() : 0;
         }
     }
+    
+    
+    /// <summary>
+    /// Average RSSI across all hops and all images, excluding zero (unset) values.
+    /// </summary>
+    public double AvgRssiDbm
+    {
+        get
+        {
+            var allRssi = Entries
+                .SelectMany(e => e.PerLinkRssi)
+                .Where(r => r != 0)
+                .ToList();
+            return allRssi.Count > 0 ? allRssi.Average() : 0;
+        }
+    }
+
     public double AvgHopCount =>
         Entries.Count > 0 ? Entries.Average(e => e.HopCount) : 0;
  
