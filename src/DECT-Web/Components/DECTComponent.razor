@@ -385,9 +385,11 @@
     {
         var fetched = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
 
-        Images = ExperimentStartUtc.HasValue && Session is not null
-            ? fetched.Where(img => img.DeviceTimestamp >= Session.StartTime).ToList()
-            : fetched;
+        Images = (ExperimentStartUtc.HasValue && Session is not null
+                ? fetched.Where(img => img.DeviceTimestamp >= Session.StartTime)
+                : fetched)
+            .OrderBy(img => img.DeviceTimestamp)
+            .ToList();
 
         if (_imageIndex >= Images.Count)
             _imageIndex = Math.Max(0, Images.Count - 1);
@@ -403,6 +405,8 @@
 
             var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
             if (!_seenImageKeys.Add(key)) continue;
+
+            _imageIndex = 0;
 
             // ── Inter-arrival ─────────────────────────────────────────────
             if (_lastImageTimestamp.HasValue)
@@ -505,20 +509,28 @@
         _            => $"{bytes} B"
     };
 
-    private static string GetDeviceLabel(int index, int total) => (index, total) switch
+    private static string GetDeviceLabel(int index, int total, string nodeId = "") => (index, total, nodeId) switch
     {
-        (0, _)                    => "Edge PT",
-        _ when index == total - 1 => "Sink FT",
-        _                         => $"Relay {index}",
+        (0, _, _)                          => "Edge PT",
+        _ when index == total - 1         => "Sink FT",
+        _ when nodeId == "0xcccccccc"     => "Relay B|C",
+        _ when nodeId == "0xeeeeeeee"     => "Relay D|E",
+        _                                  => $"Relay {index}",
     };
-
+    
+    private static string GetNodeColor(int index, int total) => (index, total) switch
+    {
+        (0, _)                    => "#27ae60",  // green  — Edge PT
+        _ when index == total - 1 => "#8e44ad",  // purple — Sink FT
+        _                         => "#e67e22",  // orange — relay
+    };
+    
     private string GetLinkLabel(int linkIdx)
     {
-        // linkIdx 0 = Edge PT→first relay/sink, 1 = relay→sink, etc.
         var nodes = Image?.DevicesVisited;
         if (nodes is null || nodes.Count < 2) return $"Link {linkIdx}";
-        var from = GetDeviceLabel(linkIdx,     nodes.Count);
-        var to   = GetDeviceLabel(linkIdx + 1, nodes.Count);
+        var from = GetDeviceLabel(linkIdx - 1, nodes.Count, nodes[linkIdx - 1]);
+        var to   = GetDeviceLabel(linkIdx,     nodes.Count, nodes[linkIdx]);
         return $"{from} → {to}";
     }
 
@@ -546,9 +558,9 @@
         {
             int x  = 10 + i * (nodeW + gap);
             int cx = x + nodeW / 2;
-            string label = GetDeviceLabel(i, total);
-
-            sb.Append($"<rect x=\"{x}\" y=\"{nodeY}\" width=\"{nodeW}\" height=\"{nodeH}\" rx=\"8\" fill=\"#3d8bff\" fill-opacity=\"0.85\"/>");
+            string label = GetDeviceLabel(i, total, nodes[i]);
+            string color = GetNodeColor(i, total);
+            sb.Append($"<rect x=\"{x}\" y=\"{nodeY}\" width=\"{nodeW}\" height=\"{nodeH}\" rx=\"8\" fill=\"{color}\" fill-opacity=\"0.9\"/>");
             sb.Append($"<text x=\"{cx}\" y=\"{nodeY + 19}\" text-anchor=\"middle\" fill=\"white\" font-size=\"11\" font-weight=\"bold\">{label}</text>");
             sb.Append($"<text x=\"{cx}\" y=\"{nodeY + 33}\" text-anchor=\"middle\" fill=\"white\" font-size=\"9\" opacity=\"0.75\">{nodes[i]}</text>");
 
@@ -560,7 +572,7 @@
 
                 // Delay above arrow
                 string delayLabel = (i + 1 < delays.Count && delays[i + 1] > 0)
-                    ? $"{delays[i + 1]} ms" : "—";
+                    ? $"{delays[i + 1] - delays[i]} ms" : "—";
                 // RSSI below arrow
                 string rssiLabel = (rssi is not null && i + 1 < rssi.Count && rssi[i + 1] != 0)
                     ? $"{rssi[i + 1]} dBm" : "—";
