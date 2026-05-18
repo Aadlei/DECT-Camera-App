@@ -17,10 +17,9 @@ public class ExperimentDto
     
     public double ThroughputBytesPerSecond => ElapsedTime.TotalSeconds > 0 ? TotalBytes / ElapsedTime.TotalSeconds : 0;
     public double AvgEndToEndDelayMs  => Entries.Count > 0 ? Entries.Average(e => e.EndToEndDelayMs) : 0;
-    public int    DroppedPackets      { get; set; }
-    public double PacketLossPercent   => _totalExpected > 0 ? DroppedPackets * 100.0 / _totalExpected : 0;
-    private int _totalExpected;
-    
+    public int DroppedPackets { get; set; }
+    public int TotalExpected  { get; set; }
+    public double PacketLossPercent => TotalExpected > 0 ? DroppedPackets * 100.0 / TotalExpected : 0;
     /// <summary>
     /// Average inter-arrival across all hops 
     /// </summary>
@@ -29,9 +28,9 @@ public class ExperimentDto
         get
         {
             if (Entries.Count < 2) return 0;
-            var ordered = Entries.OrderBy(e => e.ReceivedAt).ToList();
+            var ordered = Entries.OrderBy(e => e.DeviceTimestamp).ToList();
             var deltas = ordered
-                .Zip(ordered.Skip(1), (a, b) => (b.ReceivedAt - a.ReceivedAt).TotalMilliseconds)
+                .Zip(ordered.Skip(1), (a, b) => (b.DeviceTimestamp - a.DeviceTimestamp).TotalMilliseconds)
                 .ToList();
             return deltas.Count > 0 ? deltas.Average() : 0;
         }

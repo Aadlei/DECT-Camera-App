@@ -317,7 +317,6 @@
 
     // ── Packet loss tracking ──────────────────────────────────────────────
     private int _lastSeenSeqNum = -1;
-    private int _totalExpected  = 0;
 
     // ─────────────────────────────────────────────────────────────────────
 
@@ -470,11 +469,11 @@
                     if (gap > 0)
                     {
                         Session.DroppedPackets += gap;
-                        _totalExpected += gap;
+                        Session.TotalExpected  += gap;
                     }
                 }
                 _lastSeenSeqNum = img.SequenceNumber;
-                _totalExpected++;
+                Session.TotalExpected++;
             }
         }
     }
@@ -499,7 +498,6 @@
         _e2eData.Clear();
         _perLinkRssiData.Clear();
         _lastSeenSeqNum = -1;
-        _totalExpected  = 0;
     }
 
     private static string FormatBytes(long bytes) => bytes switch
