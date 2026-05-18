@@ -93,6 +93,7 @@ public class MongoDbService
         HopCount       = doc.GetValue("num_links", 0).ToInt32(),
         DeviceTimestamp = doc["timestamp"].ToUniversalTime(),
         SizeBytes      = doc["size_bytes"].ToInt32(),
+        SequenceNumber = doc["seq_number"].ToInt32(),
 
         DevicesVisited = doc.Contains("devices_visited")
             ? doc["devices_visited"].AsBsonArray
