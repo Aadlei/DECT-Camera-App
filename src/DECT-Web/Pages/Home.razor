@@ -74,10 +74,13 @@
 
         for (const id of chartIds) {
             const el = document.getElementById(id);
-            if (el) {
+            if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) continue;
+            try {
                 const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
                 const pngData = canvas.toDataURL('image/png').split(',')[1];
                 zip.file(`${id}.png`, pngData, { base64: true });
+            } catch (e) {
+                console.warn(`Failed to capture ${id}:`, e);
             }
         }
 
@@ -198,39 +201,52 @@
         var sb = new StringBuilder();
 
         // ── Header row ────────────────────────────────────────────────────
-        sb.AppendLine("Seq,TransmitterId,DeviceTimestampUtc,ReceivedAtUtc,SizeBytes,HopCount," +
+        sb.AppendLine("Seq,FirmwareSeq,TransmitterId,DeviceTimestampUtc,ReceivedAtUtc,SizeBytes,HopCount," +
                       "EndToEndDelayMs,PerLinkDelays_ms,PerLinkRssi_dBm");
 
         // ── Data rows ─────────────────────────────────────────────────────
         foreach (var e in allEntries)
         {
-            var delays = e.PerLinkDelayMs?.Count > 0
-                ? string.Join(";", e.PerLinkDelayMs)
-                : "";
-            var rssi = e.PerLinkRssi?.Count > 0
-                ? string.Join(";", e.PerLinkRssi)
-                : "";
+            var delays = e.PerLinkDelayMs?.Count > 0 ? string.Join(";", e.PerLinkDelayMs) : "";
+            var rssi   = e.PerLinkRssi?.Count > 0    ? string.Join(";", e.PerLinkRssi)    : "";
 
             sb.AppendLine(string.Join(",",
                 e.SequenceNumber,
+                e.FirmwareSeqNum,
                 e.TransmitterId,
                 e.DeviceTimestamp.ToString("O"),
                 e.ReceivedAt.ToString("O"),
                 e.SizeBytes,
                 e.HopCount,
                 $"{e.EndToEndDelayMs:F1}",
-                $"\"{delays}\"",   // quoted so semicolons don't break CSV parsers
+                $"\"{delays}\"",
                 $"\"{rssi}\""));
         }
 
         // ── Summary footer ────────────────────────────────────────────────
+        var totalDropped  = _sessions.Values.Where(s => s is not null).Sum(s => s!.DroppedPackets);
+        var totalExpected = _sessions.Values.Where(s => s is not null).Sum(s => s!.TotalExpected);
+        var lossPct = totalExpected > 0 ? totalDropped * 100.0 / totalExpected : 0;
+
         sb.AppendLine();
         sb.AppendLine($"# Experiment Duration (s),{elapsed.TotalSeconds:F2}");
         sb.AppendLine($"# Total Images,{allEntries.Count}");
         sb.AppendLine($"# Total Bytes,{totalBytes}");
         sb.AppendLine($"# Throughput (kbps),{(elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / 1000 / elapsed.TotalSeconds : 0):F2}");
         sb.AppendLine($"# Avg RSSI (dBm),{(_sessions.Values.Where(s => s is not null).Select(s => s!.AvgRssiDbm).DefaultIfEmpty(0).Average()):F1}");
-
+        sb.AppendLine($"# Dropped Packets,{totalDropped}");
+        sb.AppendLine($"# Total Expected,{totalExpected}");
+        sb.AppendLine($"# Packet Loss (%),{lossPct:F2}");
+        sb.AppendLine();
+        sb.AppendLine("# Per-Transmitter Summary");
+        sb.AppendLine("# TransmitterId,Images,Bytes,Dropped,Expected,LossPct,AvgRssiDbm,AvgE2EMs,AvgHops");
+        foreach (var (id, s) in _sessions.Where(kv => kv.Value is not null))
+        {
+            var pct = s!.TotalExpected > 0 ? s.DroppedPackets * 100.0 / s.TotalExpected : 0;
+            sb.AppendLine($"# {id},{s.TotalImages},{s.TotalBytes},{s.DroppedPackets},{s.TotalExpected},{pct:F2},{s.AvgRssiDbm:F1},{s.AvgEndToEndDelayMs:F1},{s.AvgHopCount:F2}");
+        }
+        
+        
         var csvBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(sb.ToString()));
 
         var chartIds = TransmitterIds!.SelectMany(id => new[]
@@ -239,6 +255,8 @@
             $"throughput-chart-{id}",
             $"linkdelay-chart-{id}",
             $"rssi-chart-{id}",
+            $"packetloss-chart-{id}",
+            $"topology-svg-{id}",
         }).ToList();
 
         var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.zip";

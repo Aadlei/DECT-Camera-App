@@ -116,10 +116,11 @@
                                                   CategoryProperty="Seq"
                                                   ValueProperty="Ms"
                                                   Title="Inter-arrival"
-                                                  Smooth="true">
-                                    <RadzenMarkers MarkerType="MarkerType.Circle" Size="4"/>
+                                                  Smooth="true"
+                                                  StrokeWidth="1.5">
+                                    <RadzenMarkers MarkerType="MarkerType.None"/>
                                 </RadzenLineSeries>
-                                <RadzenCategoryAxis>
+                                <RadzenCategoryAxis Step="@InterArrivalAxisStep" FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="image #"/>
                                 </RadzenCategoryAxis>
                                 <RadzenValueAxis FormatString="{0:F0}">
@@ -137,7 +138,6 @@
                     }
                 </ChildContent>
             </RadzenPanel>
-
             @* ── Topology ── *@
             @if (Image?.DevicesVisited?.Count > 1)
             {
@@ -149,7 +149,7 @@
                         </RadzenText>
                     </HeaderTemplate>
                     <ChildContent>
-                        <div style="overflow-x: auto; padding: 1rem;">
+                        <div id="@($"topology-svg-{TransmitterId}")" style="overflow-x: auto; padding: 1rem;">
                             @((MarkupString)BuildTopologySvg())
                         </div>
                     </ChildContent>
@@ -172,15 +172,56 @@
                                 <RadzenAreaSeries Data="_throughputData"
                                                   CategoryProperty="ElapsedSeconds"
                                                   ValueProperty="Kbps"
-                                                  Title="kbps"
-                                                  Smooth="true">
+                                                  Title="@($"kbps ({ThroughputWindowSec:F0}s window)")"
+                                                  Smooth="true"
+                                                  StrokeWidth="1.5">
                                     <RadzenMarkers MarkerType="MarkerType.None"/>
                                 </RadzenAreaSeries>
-                                <RadzenCategoryAxis FormatString="{0:F0}">
+                                <RadzenCategoryAxis Step="@ThroughputAxisStep" FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="Elapsed (s)"/>
                                 </RadzenCategoryAxis>
                                 <RadzenValueAxis FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="kbps"/>
+                                </RadzenValueAxis>
+                                <RadzenChartTooltipOptions Shared="false"/>
+                            </RadzenChart>
+                        </div>
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="text-muted" Style="padding: 1rem;">
+                            Waiting for data...
+                        </RadzenText>
+                    }
+                </ChildContent>
+            </RadzenPanel>
+            
+            @* ── Packet Loss ── *@
+            <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
+                <HeaderTemplate>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                        <RadzenIcon Icon="error_outline" class="rz-me-1"/>
+                        <b>Packet Loss</b>
+                    </RadzenText>
+                </HeaderTemplate>
+                <ChildContent>
+                    @if (_packetLossData.Count > 1)
+                    {
+                        <div id="@($"packetloss-chart-{TransmitterId}")">
+                            <RadzenChart Style="height: 250px;">
+                                <RadzenLineSeries Data="_packetLossData"
+                                                  CategoryProperty="Seq"
+                                                  ValueProperty="Percent"
+                                                  Title="loss %"
+                                                  Smooth="false"
+                                                  StrokeWidth="1.5">
+                                    <RadzenMarkers MarkerType="MarkerType.None"/>
+                                </RadzenLineSeries>
+                                <RadzenCategoryAxis Step="@PacketLossAxisStep" FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="image #"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis FormatString="{0:F1}">
+                                    <RadzenAxisTitle Text="%"/>
                                 </RadzenValueAxis>
                                 <RadzenChartTooltipOptions Shared="false"/>
                             </RadzenChart>
@@ -258,7 +299,7 @@
                                 <RadzenCategoryAxis>
                                     <RadzenAxisTitle Text="image #"/>
                                 </RadzenCategoryAxis>
-                                <RadzenValueAxis FormatString="{0:F0}">
+                                <RadzenValueAxis FormatString="{0:F0}" Min="-120" Max="-40">
                                     <RadzenAxisTitle Text="dBm"/>
                                 </RadzenValueAxis>
                                 <RadzenLegend Position="LegendPosition.Bottom"/>
@@ -287,17 +328,18 @@
     public ExperimentDto?  Session { get; private set; }
     public List<ImageDto>  Images  { get; set; } = new();
     private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
-
+    private const double ThroughputWindowSec = 5.0;
     private DateTime? _lastImageTimestamp;
     private CancellationTokenSource? _pollCts;
     private readonly HashSet<string> _seenImageKeys = new();
     private int  _imageIndex;
     private int  _sequenceCounter;
     private bool _wasRunning;
-
-    /* Radzen re-renders the entire chart on every StateHasChanged, so cap the
-     * number of points to keep render time bounded during long experiments. */
+    private int InterArrivalAxisStep => Math.Max(1, _interArrivalData.Count / 10);
+    private record PacketLossPoint(int Seq, double Percent);
+    private readonly List<PacketLossPoint> _packetLossData = new();
     private const int MaxChartPoints = 400;
+    private int PacketLossAxisStep => Math.Max(1, _packetLossData.Count / 10);
 
     // ── Graph data ────────────────────────────────────────────────────────
     private record InterArrivalPoint(int Seq, double Ms);
@@ -315,6 +357,8 @@
     private record RssiPoint(int Seq, double Dbm);
     private readonly Dictionary<int, List<RssiPoint>> _perLinkRssiData = new();
 
+    
+    private int ThroughputAxisStep => Math.Max(1, _throughputData.Count / 6);
     // ── Packet loss tracking ──────────────────────────────────────────────
     private int _lastSeenSeqNum = -1;
 
@@ -424,16 +468,23 @@
                 SizeBytes       = img.SizeBytes,
                 HopCount        = img.HopCount,
                 SequenceNumber  = _sequenceCounter++,
+                FirmwareSeqNum  = img.FirmwareSeqNum,
                 PerLinkDelayMs  = img.PerLinkDelayMs,
                 PerLinkRssi     = img.PerLinkRssi,
             });
 
             // ── Throughput ────────────────────────────────────────────────
-            var elapsed = (DateTime.UtcNow - Session.StartTime).TotalSeconds;
-            if (elapsed > 0)
+            var now = DateTime.UtcNow;
+            var windowStart = now.AddSeconds(-ThroughputWindowSec);
+            long bytesInWindow = Session.Entries
+                .Where(e => e.ReceivedAt >= windowStart)
+                .Sum(e => e.SizeBytes);
+            double windowSec = Math.Min(ThroughputWindowSec, (now - Session.StartTime).TotalSeconds);
+            if (windowSec > 0)
             {
-                var kbps = Session.TotalBytes * 8.0 / 1000 / elapsed;
-                AddCapped(_throughputData, new ThroughputPoint(Math.Round(elapsed, 1), Math.Round(kbps, 0)));
+                double kbps = bytesInWindow * 8.0 / 1000 / windowSec;
+                double elapsedTotal = (now - Session.StartTime).TotalSeconds;
+                AddCapped(_throughputData, new ThroughputPoint(Math.Round(elapsedTotal, 1), Math.Round(kbps, 1)));
             }
 
             // ── Per-link delay ────────────────────────────────────────────
@@ -443,7 +494,8 @@
                 {
                     if (!_perLinkData.ContainsKey(li))
                         _perLinkData[li] = new();
-                    AddCapped(_perLinkData[li], new LinkDelayPoint(_sequenceCounter, img.PerLinkDelayMs[li]));
+                    double hopDelay = img.PerLinkDelayMs[li] - img.PerLinkDelayMs[li - 1];
+                    AddCapped(_perLinkData[li], new LinkDelayPoint(_sequenceCounter, hopDelay));
                 }
                 AddCapped(_e2eData, new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
             }
@@ -461,19 +513,24 @@
             }
 
             // ── Packet loss ───────────────────────────────────────────────
-            if (img.SequenceNumber > 0)
+            if (img.FirmwareSeqNum > 0)
             {
                 if (_lastSeenSeqNum >= 0)
                 {
-                    int gap = img.SequenceNumber - _lastSeenSeqNum - 1;
+                    int gap = img.FirmwareSeqNum - _lastSeenSeqNum - 1;
                     if (gap > 0)
                     {
                         Session.DroppedPackets += gap;
                         Session.TotalExpected  += gap;
                     }
                 }
-                _lastSeenSeqNum = img.SequenceNumber;
+                _lastSeenSeqNum = img.FirmwareSeqNum;
                 Session.TotalExpected++;
+
+                double pct = Session.TotalExpected > 0
+                    ? Session.DroppedPackets * 100.0 / Session.TotalExpected
+                    : 0;
+                AddCapped(_packetLossData, new PacketLossPoint(_sequenceCounter, pct));
             }
         }
     }
@@ -497,6 +554,7 @@
         _perLinkData.Clear();
         _e2eData.Clear();
         _perLinkRssiData.Clear();
+        _packetLossData.Clear();
         _lastSeenSeqNum = -1;
     }
 

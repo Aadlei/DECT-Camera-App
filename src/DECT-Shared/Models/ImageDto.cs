@@ -9,10 +9,15 @@ public class ImageDto
     public byte[] Image { get; set; }
     public string? ImageDataUrl => $"data:image/jpeg;base64,{Convert.ToBase64String(Image)}";
     public int ImageCount { get; set; }
+    /// <summary>Firmware wire-format seq_num (from edge PT). Used for packet loss.</summary>
+    public int FirmwareSeqNum { get; set; }
+    
+    /// <summary>Dashboard arrival order (per-component counter). Used for chart X axes.</summary>
     public int SequenceNumber { get; set; }
     public int SizeBytes { get; set; }
     public List<string> DevicesVisited { get; set; } = new();
     public List<long>   PerLinkDelayMs { get; set; } = new();
-    public long EndToEndDelayMs => PerLinkDelayMs.Skip(1).Sum(); // index 0 is always 0
+    public long EndToEndDelayMs => 
+        PerLinkDelayMs is { Count: > 0 } ? PerLinkDelayMs[^1] : 0; // index 0 is always 0
     public List<int> PerLinkRssi { get; set; } = new();
 }
