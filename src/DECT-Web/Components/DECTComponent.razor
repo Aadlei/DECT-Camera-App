@@ -172,7 +172,7 @@
                                 <RadzenAreaSeries Data="_throughputData"
                                                   CategoryProperty="ElapsedSeconds"
                                                   ValueProperty="Kbps"
-                                                  Title="@($"kbps ({ThroughputWindowSec:F0}s window)")"
+                                                  Title="@($"kbps)")"
                                                   Smooth="true"
                                                   StrokeWidth="1.5">
                                     <RadzenMarkers MarkerType="MarkerType.None"/>
@@ -328,7 +328,7 @@
     public ExperimentDto?  Session { get; private set; }
     public List<ImageDto>  Images  { get; set; } = new();
     private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
-    private const double ThroughputWindowSec = 5.0;
+    private const double ThroughputWindowSec = 10.0;
     private DateTime? _lastImageTimestamp;
     private CancellationTokenSource? _pollCts;
     private readonly HashSet<string> _seenImageKeys = new();
@@ -472,21 +472,20 @@
                 PerLinkDelayMs  = img.PerLinkDelayMs,
                 PerLinkRssi     = img.PerLinkRssi,
             });
-
             // ── Throughput ────────────────────────────────────────────────
             var now = DateTime.UtcNow;
-            var windowStart = now.AddSeconds(-ThroughputWindowSec);
-            long bytesInWindow = Session.Entries
-                .Where(e => e.ReceivedAt >= windowStart)
-                .Sum(e => e.SizeBytes);
-            double windowSec = Math.Min(ThroughputWindowSec, (now - Session.StartTime).TotalSeconds);
-            if (windowSec > 0)
+            double elapsedTotal = (now - Session.StartTime).TotalSeconds;
+
+            if (elapsedTotal >= ThroughputWindowSec)
             {
-                double kbps = bytesInWindow * 8.0 / 1000 / windowSec;
-                double elapsedTotal = (now - Session.StartTime).TotalSeconds;
+                var windowStart = now.AddSeconds(-ThroughputWindowSec);
+                long bytesInWindow = Session.Entries
+                    .Where(e => e.ReceivedAt >= windowStart)
+                    .Sum(e => e.SizeBytes);
+
+                double kbps = bytesInWindow * 8.0 / 1000 / ThroughputWindowSec;
                 AddCapped(_throughputData, new ThroughputPoint(Math.Round(elapsedTotal, 1), Math.Round(kbps, 1)));
             }
-
             // ── Per-link delay ────────────────────────────────────────────
             if (img.PerLinkDelayMs?.Count > 1)
             {
