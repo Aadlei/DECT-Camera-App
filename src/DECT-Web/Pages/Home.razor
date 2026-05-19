@@ -4,13 +4,13 @@
 @using DECT_Shared.Models
 @using DECT_Web.Components
 @using DECT_Web.Services
-@using Radzen.Blazor.Markdown
 @inject MongoDbServices MongoDbService
 @inject DialogService DialogService
 @inject IJSRuntime JS
 
-<RadzenDialog />
-@if (TransmitterIds?.Count > 0)
+<RadzenDialog/>
+
+@if (TransmitterIds is { Count: > 0 })
 {
     <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
         <RadzenText TextStyle="TextStyle.H4" class="rz-my-2"
@@ -18,6 +18,7 @@
             @_stopwatch.Elapsed.ToString(@"hh\:mm\:ss\.ff")
         </RadzenText>
     </RadzenStack>
+
     <RadzenStack Orientation="Orientation.Horizontal"
                  AlignItems="AlignItems.Center"
                  JustifyContent="JustifyContent.Center"
@@ -29,24 +30,25 @@
                                Click="StartWithDuration"
                                AlwaysOpenPopup="false">
                 <ChildContent>
-                    <RadzenSplitButtonItem Text="1 minute"       Value="60" />
-                    <RadzenSplitButtonItem Text="5 minutes"      Value="300" />
-                    <RadzenSplitButtonItem Text="10 minutes"     Value="600" />
-                    <RadzenSplitButtonItem Text="1 hour"         Value="3600" />
-                    <RadzenSplitButtonItem Text="Custom..."      Value="custom" />
-                    <RadzenSplitButtonItem Text="Run indefinitely" Value="0" />
+                    @foreach (var preset in DurationPresets)
+                    {
+                        <RadzenSplitButtonItem Text="@preset.Label" Value="@preset.Value"/>
+                    }
+                    <RadzenSplitButtonItem Text="Custom..."        Value="custom"/>
+                    <RadzenSplitButtonItem Text="Run indefinitely" Value="0"/>
                 </ChildContent>
             </RadzenSplitButton>
         }
         else
         {
-            <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="StopExperimentAsync" Text="STOP" />
+            <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="StopExperiment" Text="STOP"/>
         }
         <RadzenButton ButtonStyle="ButtonStyle.Success"
                       Disabled="@(!IsExportReady)"
                       Click="ExportCsvAsync"
-                      Text="EXPORT CSV" />
+                      Text="EXPORT CSV"/>
     </RadzenStack>
+
     <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap"
                  JustifyContent="JustifyContent.Center" Gap="1rem">
         @foreach (var id in TransmitterIds)
@@ -54,20 +56,20 @@
             <DECTComponent TransmitterId="@id"
                            ExperimentRunning="_experimentRunning"
                            ExperimentStartUtc="_experimentStartUtc"
-                           SessionChanged="s => OnSessionChanged(id, s)" />
+                           SessionChanged="s => OnSessionChanged(id, s)"/>
         }
     </RadzenStack>
 }
-<script>
-    window.downloadFile = (fileName, base64) => {
-        const link = document.createElement('a');
-        link.href = 'data:text/csv;base64,' + base64;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
+else
+{
+    <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center"
+                 Gap="0.75rem" class="rz-my-10">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+        <RadzenText TextStyle="TextStyle.Body2" class="text-muted">Looking for transmitters…</RadzenText>
+    </RadzenStack>
+}
 
+<script>
     window.exportZip = async (fileName, csvBase64, chartIds) => {
         const zip = new JSZip();
         zip.file("experiment.csv", csvBase64, { base64: true });
@@ -85,9 +87,9 @@
         }
 
         const blob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
@@ -95,27 +97,35 @@
 </script>
 
 @code {
+    private static readonly (string Label, string Value)[] DurationPresets =
+    {
+        ("1 minute",   "60"),
+        ("5 minutes",  "300"),
+        ("10 minutes", "600"),
+        ("1 hour",     "3600"),
+    };
+
+    // ── State ─────────────────────────────────────────────────────────────
     private List<string>? TransmitterIds { get; set; }
     private readonly Stopwatch _stopwatch = new();
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
-    private bool _showCustomInput;
     private bool _experimentRunning;
     private DateTime? _experimentStartUtc;
     private TimeSpan? _experimentDuration;
-    private int _customSeconds;
 
     private readonly Dictionary<string, ExperimentDto?> _sessions = new();
 
     private bool IsExportReady =>
         !_experimentRunning && _sessions.Values.Any(s => s is { TotalImages: > 0 });
 
+    // ── Lifecycle ────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         TransmitterIds = await MongoDbService.GetAllTransmittersAsync();
-        Console.WriteLine($"Initialized Home page with {TransmitterIds?.Count} transmitters");
     }
 
+    // ── Start / stop ─────────────────────────────────────────────────────
     private async Task StartWithDuration(RadzenSplitButtonItem? item)
     {
         var value = item?.Value?.ToString();
@@ -126,19 +136,28 @@
             return;
         }
 
-        var seconds = value is not null ? int.Parse(value) : 0;
+        var seconds = value is not null && int.TryParse(value, out var s) ? s : 0;
         _experimentDuration = seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
-        await InitiateExperimentAsync();
+        StartExperiment();
     }
 
-    private async Task InitiateExperimentAsync()
+    private async Task ShowCustomDurationDialog()
+    {
+        var result = await DialogService.OpenAsync<CustomInputDialog>("Custom Duration");
+        if (result is int seconds && seconds > 0)
+        {
+            _experimentDuration = TimeSpan.FromSeconds(seconds);
+            StartExperiment();
+        }
+    }
+
+    private void StartExperiment()
     {
         _experimentStartUtc = DateTime.UtcNow;
         _experimentRunning  = true;
         _sessions.Clear();
 
-        _stopwatch.Reset();
-        _stopwatch.Start();
+        _stopwatch.Restart();
 
         _cts   = new CancellationTokenSource();
         _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
@@ -151,7 +170,7 @@
                 {
                     if (_experimentDuration.HasValue && _stopwatch.Elapsed >= _experimentDuration.Value)
                     {
-                        await InvokeAsync(StopExperimentAsync);
+                        await InvokeAsync(StopExperiment);
                         break;
                     }
                     await InvokeAsync(StateHasChanged);
@@ -161,7 +180,7 @@
         });
     }
 
-    private void StopExperimentAsync()
+    private void StopExperiment()
     {
         _experimentRunning = false;
         _stopwatch.Stop();
@@ -170,21 +189,10 @@
         StateHasChanged();
     }
 
-    private async Task ShowCustomDurationDialog()
-    {
-        var result = await DialogService.OpenAsync<CustomInputDialog>("Custom Duration");
-        if (result is int seconds && seconds > 0)
-        {
-            _experimentDuration = TimeSpan.FromSeconds(seconds);
-            await InitiateExperimentAsync();
-        }
-    }
-
-    private void OnSessionChanged(string txId, ExperimentDto? session)
-    {
+    private void OnSessionChanged(string txId, ExperimentDto? session) =>
         _sessions[txId] = session;
-    }
 
+    // ── CSV / ZIP export ─────────────────────────────────────────────────
     private async Task ExportCsvAsync()
     {
         var allEntries = _sessions.Values
@@ -195,8 +203,29 @@
 
         if (allEntries.Count == 0) return;
 
+        var csvBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(BuildCsv(allEntries)));
+
+        /* These must match the DOM ids set by ChartPanel.DomId in DECTComponent.razor.
+         * Mismatch silently drops the chart from the PNG export. */
+        var chartIds = TransmitterIds!.SelectMany(id => new[]
+        {
+            $"endtoend-chart-{id}",
+            $"goodput-chart-{id}",
+            $"goodput-histogram-{id}",
+            $"imageloss-chart-{id}",
+            $"hoplatency-chart-{id}",
+            $"rssi-chart-{id}",
+            $"topology-svg-{id}",
+        }).ToList();
+
+        var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.zip";
+        await JS.InvokeVoidAsync("exportZip", fileName, csvBase64, chartIds);
+    }
+
+    private string BuildCsv(List<ImageDto> entries)
+    {
         var elapsed    = _stopwatch.Elapsed;
-        var totalBytes = allEntries.Sum(e => e.SizeBytes);
+        var totalBytes = entries.Sum(e => e.SizeBytes);
 
         var sb = new StringBuilder();
 
@@ -205,10 +234,10 @@
                       "EndToEndDelayMs,PerHopLatencies_ms,PerLinkRssi_dBm");
 
         // ── Data rows ─────────────────────────────────────────────────────
-        foreach (var e in allEntries)
+        foreach (var e in entries)
         {
             var delays = e.PerHopLatencyMs?.Count > 0 ? string.Join(";", e.PerHopLatencyMs) : "";
-            var rssi   = e.PerLinkRssi?.Count > 0    ? string.Join(";", e.PerLinkRssi)    : "";
+            var rssi   = e.PerLinkRssi?.Count    > 0 ? string.Join(";", e.PerLinkRssi)    : "";
 
             sb.AppendLine(string.Join(",",
                 e.SequenceNumber,
@@ -224,42 +253,34 @@
         }
 
         // ── Summary footer ────────────────────────────────────────────────
-        var totalDropped  = _sessions.Values.Where(s => s is not null).Sum(s => s!.DroppedImages);
-        var totalExpected = _sessions.Values.Where(s => s is not null).Sum(s => s!.TotalExpected);
-        var lossPct = totalExpected > 0 ? totalDropped * 100.0 / totalExpected : 0;
-
+        var liveSessions   = _sessions.Values.Where(s => s is not null).ToList();
+        var totalDropped   = liveSessions.Sum(s => s!.DroppedImages);
+        var totalExpected  = liveSessions.Sum(s => s!.TotalExpected);
+        var lossPct        = totalExpected > 0 ? totalDropped * 100.0 / totalExpected : 0;
+        var avgRssi        = liveSessions.Select(s => s!.AvgRssiDbm).DefaultIfEmpty(0).Average();
+        var totalOverhead  = liveSessions.Sum(s => s!.TotalOverheadBytes);
+        var goodputKbps    = elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / 1000 / elapsed.TotalSeconds : 0;
+        var throughputKbps = elapsed.TotalSeconds > 0 ? (totalBytes + totalOverhead) * 8.0 / 1000 / elapsed.TotalSeconds : 0;
         sb.AppendLine();
         sb.AppendLine($"# Experiment Duration (s),{elapsed.TotalSeconds:F2}");
-        sb.AppendLine($"# Total Images,{allEntries.Count}");
-        sb.AppendLine($"# Total Bytes,{totalBytes}");
-        sb.AppendLine($"# Throughput (kbps),{(elapsed.TotalSeconds > 0 ? totalBytes * 8.0 / 1000 / elapsed.TotalSeconds : 0):F2}");
-        sb.AppendLine($"# Avg RSSI (dBm),{(_sessions.Values.Where(s => s is not null).Select(s => s!.AvgRssiDbm).DefaultIfEmpty(0).Average()):F1}");
+        sb.AppendLine($"# Total Images,{entries.Count}");
+        sb.AppendLine($"# Total Payload Bytes,{totalBytes}");
+        sb.AppendLine($"# Total Overhead Bytes,{totalOverhead}");
+        sb.AppendLine($"# Goodput (kbps),{goodputKbps:F2}");
+        sb.AppendLine($"# Throughput (kbps),{throughputKbps:F2}");
+        sb.AppendLine($"# Avg RSSI (dBm),{avgRssi:F1}");
         sb.AppendLine($"# Dropped Packets,{totalDropped}");
         sb.AppendLine($"# Total Expected,{totalExpected}");
         sb.AppendLine($"# Packet Loss (%),{lossPct:F2}");
         sb.AppendLine();
         sb.AppendLine("# Per-Transmitter Summary");
-        sb.AppendLine("# TransmitterId,Images,Bytes,Dropped,Expected,LossPct,AvgRssiDbm,AvgE2EMs,AvgHops");
+        sb.AppendLine("# TransmitterId,Images,PayloadBytes,OverheadBytes%,Dropped,Expected,LossPct,AvgRssiDbm,AvgE2EMs,AvgHops");
         foreach (var (id, s) in _sessions.Where(kv => kv.Value is not null))
         {
-            var pct = s!.TotalExpected > 0 ? s.DroppedImages * 100.0 / s.TotalExpected : 0;
-            sb.AppendLine($"# {id},{s.TotalImages},{s.TotalBytes},{s.DroppedImages},{s.TotalExpected},{pct:F2},{s.AvgRssiDbm:F1},{s.AvgEndToEndLatencyMs:F1},{s.AvgHopCount:F2}");
+            var lossPctPerTx = s!.TotalExpected > 0 ? s.DroppedImages * 100.0 / s.TotalExpected : 0;
+            sb.AppendLine($"# {id},{s.TotalImages},{s.TotalBytes},{s.TotalOverheadBytes},{s.DroppedImages},{s.TotalExpected},{lossPctPerTx:F2},{s.AvgRssiDbm:F1},{s.AvgEndToEndLatencyMs:F1},{s.AvgHopCount:F2}");
         }
-        
-        
-        var csvBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(sb.ToString()));
 
-        var chartIds = TransmitterIds!.SelectMany(id => new[]
-        {
-            $"endtoenddelay-chart-{id}",
-            $"throughput-chart-{id}",
-            $"linkdelay-chart-{id}",
-            $"rssi-chart-{id}",
-            $"imageloss-chart-{id}",
-            $"topology-svg-{id}",
-        }).ToList();
-
-        var fileName = $"dect_experiment_{_experimentStartUtc:yyyyMMdd_HHmmss}.zip";
-        await JS.InvokeVoidAsync("exportZip", fileName, csvBase64, chartIds);
+        return sb.ToString();
     }
 }

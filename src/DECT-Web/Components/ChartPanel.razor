@@ -1,0 +1,33 @@
+@* ChartPanel.razor — Standard panel wrapper for the experiment dashboard charts. *@
+
+<RadzenPanel AllowCollapse Collapsed="@Collapsed" class="rz-my-10">
+    <HeaderTemplate>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+            <RadzenIcon Icon="@Icon" class="rz-me-1"/>
+            <b>@Title</b>
+        </RadzenText>
+    </HeaderTemplate>
+    <ChildContent>
+        @if (HasData)
+        {
+            <div id="@DomId">
+                @ChildContent
+            </div>
+        }
+        else
+        {
+            <RadzenText TextStyle="TextStyle.Body2" class="text-muted" Style="padding: 1rem;">
+                Waiting for data...
+            </RadzenText>
+        }
+    </ChildContent>
+</RadzenPanel>
+
+@code {
+    [Parameter, EditorRequired] public string Title  { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon   { get; set; } = "";
+    [Parameter, EditorRequired] public string DomId  { get; set; } = "";
+    [Parameter]                 public bool   HasData   { get; set; }
+    [Parameter]                 public bool   Collapsed { get; set; }
+    [Parameter]                 public RenderFragment? ChildContent { get; set; }
+}
