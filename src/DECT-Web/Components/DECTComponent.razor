@@ -71,23 +71,19 @@
                                     <MetricTile Label="Total Data" Value="@FormatBytes(Session.TotalBytes)"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Throughput"
-                                                Value="@($"{Session.ThroughputBytesPerSecond * 8 / 1000:F0} kbps")"/>
+                                    <MetricTile Label="Goodput"
+                                                Value="@($"{Session.GoodputBytesPerSecond * 8 / 1000:F0} kbps")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Avg Inter-Arrival"
-                                                Value="@($"{Session.AvgInterArrivalMs:F0} ms")"/>
+                                    <MetricTile Label="Avg E2E Latency"
+                                                Value="@($"{Session.AvgEndToEndLatencyMs:F0} ms")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
                                     <MetricTile Label="Avg Hops" Value="@($"{Session.AvgHopCount:F1}")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
-                                    <MetricTile Label="Avg E2E Latency"
-                                                Value="@($"{Session.AvgEndToEndDelayMs:F0} ms")"/>
-                                </RadzenColumn>
-                                <RadzenColumn Size="6">
-                                    <MetricTile Label="Packet Loss"
-                                                Value="@($"{Session.PacketLossPercent:F1} %")"/>
+                                    <MetricTile Label="Image Loss"
+                                                Value="@($"{Session.ImageLossPercent:F1} %")"/>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6">
                                     <MetricTile Label="Avg RSSI"
@@ -99,28 +95,28 @@
                 </RadzenPanel>
             }
 
-            @* ── Inter-Arrival Time ── *@
+            @* ── End-to-End Latency ── *@
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                         <RadzenIcon Icon="grouped_bar_chart" class="rz-me-1"/>
-                        <b>Inter-Arrival Time</b>
+                        <b>End-to-End Latency</b>
                     </RadzenText>
                 </HeaderTemplate>
                 <ChildContent>
-                    @if (_interArrivalData.Count > 1)
+                    @if (_e2eData.Count > 1)
                     {
-                        <div id="@($"interarrival-chart-{TransmitterId}")">
+                        <div id="@($"endtoend-chart-{TransmitterId}")">
                             <RadzenChart Style="height: 250px;">
-                                <RadzenLineSeries Data="_interArrivalData"
+                                <RadzenLineSeries Data="_e2eData"
                                                   CategoryProperty="Seq"
                                                   ValueProperty="Ms"
-                                                  Title="Inter-arrival"
+                                                  Title="E2E Latency"
                                                   Smooth="true"
                                                   StrokeWidth="1.5">
                                     <RadzenMarkers MarkerType="MarkerType.None"/>
                                 </RadzenLineSeries>
-                                <RadzenCategoryAxis Step="@InterArrivalAxisStep" FormatString="{0:F0}">
+                                <RadzenCategoryAxis Step="@EndToEndAxisStep" FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="image #"/>
                                 </RadzenCategoryAxis>
                                 <RadzenValueAxis FormatString="{0:F0}">
@@ -138,14 +134,15 @@
                     }
                 </ChildContent>
             </RadzenPanel>
-            @* ── Topology ── *@
+
+            @* ── Route ── *@
             @if (Image?.DevicesVisited?.Count > 1)
             {
                 <RadzenPanel AllowCollapse Collapsed="false" class="rz-my-10">
                     <HeaderTemplate>
                         <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                             <RadzenIcon Icon="device_hub" class="rz-me-1"/>
-                            <b>Last Path</b>
+                            <b>Most Recent Route</b>
                         </RadzenText>
                     </HeaderTemplate>
                     <ChildContent>
@@ -156,28 +153,28 @@
                 </RadzenPanel>
             }
 
-            @* ── Throughput ── *@
+            @* ── Goodput over time ── *@
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                         <RadzenIcon Icon="speed" class="rz-me-1"/>
-                        <b>Throughput</b>
+                        <b>Goodput</b>
                     </RadzenText>
                 </HeaderTemplate>
                 <ChildContent>
-                    @if (_throughputData.Count > 1)
+                    @if (_goodputData.Count > 1)
                     {
-                        <div id="@($"throughput-chart-{TransmitterId}")">
+                        <div id="@($"goodput-chart-{TransmitterId}")">
                             <RadzenChart Style="height: 280px;">
-                                <RadzenAreaSeries Data="_throughputData"
+                                <RadzenAreaSeries Data="_goodputData"
                                                   CategoryProperty="ElapsedSeconds"
                                                   ValueProperty="Kbps"
-                                                  Title="@($"kbps)")"
+                                                  Title="Goodput"
                                                   Smooth="true"
                                                   StrokeWidth="1.5">
                                     <RadzenMarkers MarkerType="MarkerType.None"/>
                                 </RadzenAreaSeries>
-                                <RadzenCategoryAxis Step="@ThroughputAxisStep" FormatString="{0:F0}">
+                                <RadzenCategoryAxis Step="@GoodputAxisStep" FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="Elapsed (s)"/>
                                 </RadzenCategoryAxis>
                                 <RadzenValueAxis FormatString="{0:F0}">
@@ -195,21 +192,63 @@
                     }
                 </ChildContent>
             </RadzenPanel>
-            
-            @* ── Packet Loss ── *@
+
+            @* ── Goodput Distribution ── *@
+            <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
+                <HeaderTemplate>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
+                        <RadzenIcon Icon="bar_chart" class="rz-me-1"/>
+                        <b>Goodput Distribution</b>
+                    </RadzenText>
+                </HeaderTemplate>
+                <ChildContent>
+                    @if (_goodputHistogram.Count > 0)
+                    {
+                        <div id="@($"goodput-histogram-{TransmitterId}")">
+                            <RadzenChart Style="height: 260px;">
+                                <RadzenColumnSeries TItem="GoodputBin"
+                                                    Data="@_goodputHistogram"
+                                                    CategoryProperty="@nameof(GoodputBin.Label)"
+                                                    ValueProperty="@nameof(GoodputBin.Count)"
+                                                    Title="samples"
+                                                    StrokeWidth="0">
+                                </RadzenColumnSeries>
+                                <RadzenColumnOptions Radius="2"/>
+                                <RadzenCategoryAxis>
+                                    <RadzenAxisTitle Text="kbps"/>
+                                </RadzenCategoryAxis>
+                                <RadzenValueAxis Min="0" Step="@GoodputHistogramValueAxisStep" FormatString="{0:F0}">
+                                    <RadzenAxisTitle Text="samples"/>
+                                </RadzenValueAxis>
+                                <RadzenChartTooltipOptions Shared="false"/>
+                            </RadzenChart>
+                        </div>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted" Style="padding: 0 1rem;">
+                            @($"n = {_goodputData.Count} samples, median ≈ {GoodputMedian():F0} kbps, p95 ≈ {GoodputPercentile(0.95):F0} kbps")
+                        </RadzenText>
+                    }
+                    else
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" class="text-muted" Style="padding: 1rem;">
+                            Waiting for data...
+                        </RadzenText>
+                    }
+                </ChildContent>
+            </RadzenPanel>
+            @* ── Image Loss ── *@
             <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                 <HeaderTemplate>
                     <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                         <RadzenIcon Icon="error_outline" class="rz-me-1"/>
-                        <b>Packet Loss</b>
+                        <b>Image Loss</b>
                     </RadzenText>
                 </HeaderTemplate>
                 <ChildContent>
-                    @if (_packetLossData.Count > 1)
+                    @if (_imageLossData.Count > 1)
                     {
-                        <div id="@($"packetloss-chart-{TransmitterId}")">
+                        <div id="@($"imageloss-chart-{TransmitterId}")">
                             <RadzenChart Style="height: 250px;">
-                                <RadzenLineSeries Data="_packetLossData"
+                                <RadzenLineSeries Data="_imageLossData"
                                                   CategoryProperty="Seq"
                                                   ValueProperty="Percent"
                                                   Title="loss %"
@@ -217,7 +256,7 @@
                                                   StrokeWidth="1.5">
                                     <RadzenMarkers MarkerType="MarkerType.None"/>
                                 </RadzenLineSeries>
-                                <RadzenCategoryAxis Step="@PacketLossAxisStep" FormatString="{0:F0}">
+                                <RadzenCategoryAxis Step="@ImageLossAxisStep" FormatString="{0:F0}">
                                     <RadzenAxisTitle Text="image #"/>
                                 </RadzenCategoryAxis>
                                 <RadzenValueAxis FormatString="{0:F1}">
@@ -236,25 +275,25 @@
                 </ChildContent>
             </RadzenPanel>
 
-            @* ── Per-Link Delay ── *@
-            @if (_perLinkData.Count > 0)
+            @* ── Per-Hop Latency ── *@
+            @if (_perHopData.Count > 0)
             {
                 <RadzenPanel Collapsed="false" AllowCollapse class="rz-my-10">
                     <HeaderTemplate>
                         <RadzenText TextStyle="TextStyle.H6" class="rz-display-flex rz-align-items-center rz-m-0">
                             <RadzenIcon Icon="timeline" class="rz-me-1"/>
-                            <b>Per-Link Delay</b>
+                            <b>Per-Hop Latency</b>
                         </RadzenText>
                     </HeaderTemplate>
                     <ChildContent>
-                        <div id="@($"linkdelay-chart-{TransmitterId}")">
+                        <div id="@($"hoplatency-chart-{TransmitterId}")">
                             <RadzenChart Style="height: 280px;">
-                                @foreach (var (linkIdx, points) in _perLinkData.OrderBy(kv => kv.Key))
+                                @foreach (var (hopIdx, points) in _perHopData.OrderBy(kv => kv.Key))
                                 {
                                     <RadzenLineSeries Data="points"
                                                       CategoryProperty="Seq"
                                                       ValueProperty="Ms"
-                                                      Title="@GetLinkLabel(linkIdx)"
+                                                      Title="@GetHopLabel(hopIdx)"
                                                       Smooth="true">
                                         <RadzenMarkers MarkerType="MarkerType.None"/>
                                     </RadzenLineSeries>
@@ -291,7 +330,7 @@
                                     <RadzenLineSeries Data="points"
                                                       CategoryProperty="Seq"
                                                       ValueProperty="Dbm"
-                                                      Title="@GetLinkLabel(linkIdx)"
+                                                      Title="@GetHopLabel(linkIdx)"
                                                       Smooth="true">
                                         <RadzenMarkers MarkerType="MarkerType.None"/>
                                     </RadzenLineSeries>
@@ -328,38 +367,74 @@
     public ExperimentDto?  Session { get; private set; }
     public List<ImageDto>  Images  { get; set; } = new();
     private ImageDto? Image => Images?.Count > 0 ? Images[Images.Count - 1 - _imageIndex] : null;
-    private const double ThroughputWindowSec = 10.0;
-    private DateTime? _lastImageTimestamp;
+    private const double GoodputWindowSec     = 10.0;
+    private const int    GoodputHistogramBins = 12;
     private CancellationTokenSource? _pollCts;
     private readonly HashSet<string> _seenImageKeys = new();
     private int  _imageIndex;
     private int  _sequenceCounter;
     private bool _wasRunning;
-    private int InterArrivalAxisStep => Math.Max(1, _interArrivalData.Count / 10);
-    private record PacketLossPoint(int Seq, double Percent);
-    private readonly List<PacketLossPoint> _packetLossData = new();
     private const int MaxChartPoints = 400;
-    private int PacketLossAxisStep => Math.Max(1, _packetLossData.Count / 10);
 
     // ── Graph data ────────────────────────────────────────────────────────
-    private record InterArrivalPoint(int Seq, double Ms);
-    private readonly List<InterArrivalPoint> _interArrivalData = new();
-
-    private record ThroughputPoint(double ElapsedSeconds, double Kbps);
-    private readonly List<ThroughputPoint> _throughputData = new();
-
-    private record LinkDelayPoint(int Seq, double Ms);
-    private readonly Dictionary<int, List<LinkDelayPoint>> _perLinkData = new();
-
+    public sealed class GoodputBin
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
     private record E2EPoint(int Seq, double Ms);
     private readonly List<E2EPoint> _e2eData = new();
+    private int EndToEndAxisStep => Math.Max(1, _e2eData.Count / 10);
+
+    private record GoodputPoint(double ElapsedSeconds, double Kbps);
+    private readonly List<GoodputPoint> _goodputData = new();
+    private int GoodputAxisStep => Math.Max(1, _goodputData.Count / 2);
+
+    /* Cached histogram; rebuilt only when a new goodput sample lands.
+     * Computing it inline in markup gave the renderer a fresh list every
+     * tick, which combined with the bar-series binding to crash the
+     * Blazor render-tree differ. */
+    private List<GoodputBin> _goodputHistogram = new();
+
+    private record HopLatencyPoint(int Seq, double Ms);
+    private readonly Dictionary<int, List<HopLatencyPoint>> _perHopData = new();
 
     private record RssiPoint(int Seq, double Dbm);
     private readonly Dictionary<int, List<RssiPoint>> _perLinkRssiData = new();
 
+    private record ImageLossPoint(int Seq, double Percent);
+    private readonly List<ImageLossPoint> _imageLossData = new();
+    private int ImageLossAxisStep => Math.Max(1, _imageLossData.Count / 10);
+
+    private double GoodputHistogramValueAxisStep
+    {
+        get
+        {
+            if (_goodputHistogram.Count == 0)
+                return 1;
+
+            var maxCount = _goodputHistogram.Max(bin => bin.Count);
+
+            if (maxCount <= 5)
+                return 1;
+
+            if (maxCount <= 10)
+                return 2;
+
+            if (maxCount <= 25)
+                return 5;
+
+            if (maxCount <= 50)
+                return 10;
+
+            if (maxCount <= 100)
+                return 20;
+
+            return NiceBinWidth(maxCount / 5.0);
+        }
+    }
     
-    private int ThroughputAxisStep => Math.Max(1, _throughputData.Count / 6);
-    // ── Packet loss tracking ──────────────────────────────────────────────
+    // ── Image loss tracking ──────────────────────────────────────────────
     private int _lastSeenSeqNum = -1;
 
     // ─────────────────────────────────────────────────────────────────────
@@ -426,11 +501,11 @@
 
     private async Task LoadImages()
     {
-        var fetched = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20);
+        var fetched = await MongoDbService.GetLastXImagesAsync(TransmitterId, 20) ?? new List<ImageDto>();
 
         Images = (ExperimentStartUtc.HasValue && Session is not null
-                ? fetched.Where(img => img.DeviceTimestamp >= Session.StartTime)
-                : fetched)
+                ? fetched.Where(img => img is not null && img.DeviceTimestamp >= Session.StartTime)
+                : fetched.Where(img => img is not null))
             .OrderBy(img => img.DeviceTimestamp)
             .ToList();
 
@@ -439,101 +514,206 @@
     }
 
     private void CollectMetrics()
+{
+    if (Session is null) return;
+
+    foreach (var img in Images)
     {
-        if (Session is null) return;
+        if (img is null) continue;
+        if (img.DeviceTimestamp < Session.StartTime) continue;
 
-        foreach (var img in Images)
+        var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
+        if (!_seenImageKeys.Add(key)) continue;
+
+        _imageIndex = 0;
+
+        Session.Entries.Add(new ImageDto
         {
-            if (img.DeviceTimestamp < Session.StartTime) continue;
+            TransmitterId   = img.TransmitterId,
+            DeviceTimestamp = img.DeviceTimestamp,
+            ReceivedAt      = DateTime.UtcNow,
+            SizeBytes       = img.SizeBytes,
+            HopCount        = img.HopCount,
+            SequenceNumber  = _sequenceCounter++,
+            FirmwareSeqNum  = img.FirmwareSeqNum,
+            PerHopLatencyMs = img.PerHopLatencyMs,
+            PerLinkRssi     = img.PerLinkRssi,
+        });
 
-            var key = $"{img.TransmitterId}_{img.DeviceTimestamp.Ticks}_{img.SizeBytes}";
-            if (!_seenImageKeys.Add(key)) continue;
+        var now = DateTime.UtcNow;
+        double elapsedTotal = (now - Session.StartTime).TotalSeconds;
 
-            _imageIndex = 0;
+        if (elapsedTotal >= GoodputWindowSec)
+        {
+            var windowStart = now.AddSeconds(-GoodputWindowSec);
 
-            // ── Inter-arrival ─────────────────────────────────────────────
-            if (_lastImageTimestamp.HasValue)
+            long bytesInWindow = Session.Entries
+                .Where(e => e is not null && e.ReceivedAt >= windowStart)
+                .Sum(e => Math.Max(0, e.SizeBytes));
+
+            double kbps = bytesInWindow * 8.0 / 1000 / GoodputWindowSec;
+
+            if (!double.IsNaN(kbps) && !double.IsInfinity(kbps) && kbps >= 0)
             {
-                var ms = (img.DeviceTimestamp - _lastImageTimestamp.Value).TotalMilliseconds;
-                AddCapped(_interArrivalData, new InterArrivalPoint(_sequenceCounter, ms));
-            }
-            _lastImageTimestamp = img.DeviceTimestamp;
-
-            // ── Session entry ─────────────────────────────────────────────
-            Session.Entries.Add(new ImageDto
-            {
-                TransmitterId   = img.TransmitterId,
-                DeviceTimestamp = img.DeviceTimestamp,
-                ReceivedAt      = DateTime.UtcNow,
-                SizeBytes       = img.SizeBytes,
-                HopCount        = img.HopCount,
-                SequenceNumber  = _sequenceCounter++,
-                FirmwareSeqNum  = img.FirmwareSeqNum,
-                PerLinkDelayMs  = img.PerLinkDelayMs,
-                PerLinkRssi     = img.PerLinkRssi,
-            });
-            // ── Throughput ────────────────────────────────────────────────
-            var now = DateTime.UtcNow;
-            double elapsedTotal = (now - Session.StartTime).TotalSeconds;
-
-            if (elapsedTotal >= ThroughputWindowSec)
-            {
-                var windowStart = now.AddSeconds(-ThroughputWindowSec);
-                long bytesInWindow = Session.Entries
-                    .Where(e => e.ReceivedAt >= windowStart)
-                    .Sum(e => e.SizeBytes);
-
-                double kbps = bytesInWindow * 8.0 / 1000 / ThroughputWindowSec;
-                AddCapped(_throughputData, new ThroughputPoint(Math.Round(elapsedTotal, 1), Math.Round(kbps, 1)));
-            }
-            // ── Per-link delay ────────────────────────────────────────────
-            if (img.PerLinkDelayMs?.Count > 1)
-            {
-                for (int li = 1; li < img.PerLinkDelayMs.Count; li++)
-                {
-                    if (!_perLinkData.ContainsKey(li))
-                        _perLinkData[li] = new();
-                    double hopDelay = img.PerLinkDelayMs[li] - img.PerLinkDelayMs[li - 1];
-                    AddCapped(_perLinkData[li], new LinkDelayPoint(_sequenceCounter, hopDelay));
-                }
-                AddCapped(_e2eData, new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
-            }
-
-            // ── Per-link RSSI ─────────────────────────────────────────────
-            if (img.PerLinkRssi?.Count > 0)
-            {
-                for (int li = 0; li < img.PerLinkRssi.Count; li++)
-                {
-                    if (img.PerLinkRssi[li] == 0) continue;
-                    if (!_perLinkRssiData.ContainsKey(li))
-                        _perLinkRssiData[li] = new();
-                    AddCapped(_perLinkRssiData[li], new RssiPoint(_sequenceCounter, img.PerLinkRssi[li]));
-                }
-            }
-
-            // ── Packet loss ───────────────────────────────────────────────
-            if (img.FirmwareSeqNum > 0)
-            {
-                if (_lastSeenSeqNum >= 0)
-                {
-                    int gap = img.FirmwareSeqNum - _lastSeenSeqNum - 1;
-                    if (gap > 0)
-                    {
-                        Session.DroppedPackets += gap;
-                        Session.TotalExpected  += gap;
-                    }
-                }
-                _lastSeenSeqNum = img.FirmwareSeqNum;
-                Session.TotalExpected++;
-
-                double pct = Session.TotalExpected > 0
-                    ? Session.DroppedPackets * 100.0 / Session.TotalExpected
-                    : 0;
-                AddCapped(_packetLossData, new PacketLossPoint(_sequenceCounter, pct));
+                AddCapped(_goodputData, new GoodputPoint(Math.Round(elapsedTotal, 1), Math.Round(kbps, 1)));
+                _goodputHistogram = BuildGoodputHistogram();
             }
         }
+
+        if (img.PerHopLatencyMs?.Count > 1)
+        {
+            for (int hi = 1; hi < img.PerHopLatencyMs.Count; hi++)
+            {
+                if (!_perHopData.ContainsKey(hi))
+                    _perHopData[hi] = new();
+
+                double hopLatency = img.PerHopLatencyMs[hi] - img.PerHopLatencyMs[hi - 1];
+                AddCapped(_perHopData[hi], new HopLatencyPoint(_sequenceCounter, hopLatency));
+            }
+
+            AddCapped(_e2eData, new E2EPoint(_sequenceCounter, img.EndToEndDelayMs));
+        }
+
+        if (img.PerLinkRssi?.Count > 0)
+        {
+            for (int li = 0; li < img.PerLinkRssi.Count; li++)
+            {
+                if (img.PerLinkRssi[li] == 0) continue;
+
+                if (!_perLinkRssiData.ContainsKey(li))
+                    _perLinkRssiData[li] = new();
+
+                AddCapped(_perLinkRssiData[li], new RssiPoint(_sequenceCounter, img.PerLinkRssi[li]));
+            }
+        }
+
+        if (img.FirmwareSeqNum > 0)
+        {
+            if (_lastSeenSeqNum >= 0)
+            {
+                int gap = img.FirmwareSeqNum - _lastSeenSeqNum - 1;
+
+                if (gap > 0)
+                {
+                    Session.DroppedImages += gap;
+                    Session.TotalExpected += gap;
+                }
+            }
+
+            _lastSeenSeqNum = img.FirmwareSeqNum;
+            Session.TotalExpected++;
+
+            double pct = Session.TotalExpected > 0
+                ? Session.DroppedImages * 100.0 / Session.TotalExpected
+                : 0;
+
+            AddCapped(_imageLossData, new ImageLossPoint(_sequenceCounter, pct));
+        }
+    }
+}
+    
+    private List<GoodputBin> BuildGoodputHistogram()
+{
+    var values = _goodputData
+        .Select(p => p.Kbps)
+        .Where(v => !double.IsNaN(v) && !double.IsInfinity(v) && v >= 0)
+        .ToArray();
+
+    if (values.Length < 2)
+        return new();
+
+    double min = values.Min();
+    double max = values.Max();
+
+    if (Math.Abs(max - min) < 0.000001)
+    {
+        return new List<GoodputBin>
+        {
+            new()
+            {
+                Label = $"{min:F1}",
+                Count = values.Length
+            }
+        };
     }
 
+    double span = max - min;
+    double rawWidth = span / GoodputHistogramBins;
+    double binWidth = NiceBinWidth(rawWidth);
+
+    if (binWidth <= 0 || double.IsNaN(binWidth) || double.IsInfinity(binWidth))
+        binWidth = 1;
+
+    double start = Math.Floor(min / binWidth) * binWidth;
+    double end = Math.Ceiling(max / binWidth) * binWidth;
+
+    int nBins = Math.Clamp((int)Math.Ceiling((end - start) / binWidth), 1, GoodputHistogramBins * 3);
+
+    var counts = new int[nBins];
+
+    foreach (var value in values)
+    {
+        int idx = (int)Math.Floor((value - start) / binWidth);
+        idx = Math.Clamp(idx, 0, nBins - 1);
+        counts[idx]++;
+    }
+
+    var result = new List<GoodputBin>(nBins);
+
+    for (int i = 0; i < nBins; i++)
+    {
+        double lo = start + i * binWidth;
+        double hi = lo + binWidth;
+
+        result.Add(new GoodputBin
+        {
+            Label = $"{lo:F0}-{hi:F0}",
+            Count = counts[i]
+        });
+    }
+
+    return result
+        .Where(bin => bin.Count > 0)
+        .ToList();
+}
+
+private static double NiceBinWidth(double raw)
+{
+    if (raw <= 0 || double.IsNaN(raw) || double.IsInfinity(raw))
+        return 1;
+
+    double mag = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+    double n = raw / mag;
+    double nice = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
+
+    return nice * mag;
+}
+
+private double GoodputMedian() => Percentile(_goodputData.Select(p => p.Kbps), 0.5);
+
+private double GoodputPercentile(double q) => Percentile(_goodputData.Select(p => p.Kbps), q);
+
+private static double Percentile(IEnumerable<double> xs, double q)
+{
+    var arr = xs
+        .Where(v => !double.IsNaN(v) && !double.IsInfinity(v) && v >= 0)
+        .OrderBy(v => v)
+        .ToArray();
+
+    if (arr.Length == 0)
+        return 0;
+
+    q = Math.Clamp(q, 0, 1);
+
+    double idx = q * (arr.Length - 1);
+    int lo = (int)Math.Floor(idx);
+    int hi = (int)Math.Ceiling(idx);
+
+    if (lo == hi)
+        return arr[lo];
+
+    return arr[lo] + (arr[hi] - arr[lo]) * (idx - lo);
+}
     private async Task NotifySessionChanged()
     {
         if (SessionChanged.HasDelegate)
@@ -547,13 +727,12 @@
         Session = new ExperimentDto { StartTime = ExperimentStartUtc ?? DateTime.UtcNow };
         _seenImageKeys.Clear();
         _sequenceCounter = 0;
-        _interArrivalData.Clear();
-        _lastImageTimestamp = null;
-        _throughputData.Clear();
-        _perLinkData.Clear();
         _e2eData.Clear();
+        _goodputData.Clear();
+        _goodputHistogram = new();
+        _perHopData.Clear();
         _perLinkRssiData.Clear();
-        _packetLossData.Clear();
+        _imageLossData.Clear();
         _lastSeenSeqNum = -1;
     }
 
@@ -572,20 +751,20 @@
         _ when nodeId == "0xeeeeeeee"     => "Relay D|E",
         _                                  => $"Relay {index}",
     };
-    
+
     private static string GetNodeColor(int index, int total) => (index, total) switch
     {
         (0, _)                    => "#27ae60",  // green  — Edge PT
         _ when index == total - 1 => "#8e44ad",  // purple — Sink FT
         _                         => "#e67e22",  // orange — relay
     };
-    
-    private string GetLinkLabel(int linkIdx)
+
+    private string GetHopLabel(int hopIdx)
     {
         var nodes = Image?.DevicesVisited;
-        if (nodes is null || nodes.Count < 2) return $"Link {linkIdx}";
-        var from = GetDeviceLabel(linkIdx - 1, nodes.Count, nodes[linkIdx - 1]);
-        var to   = GetDeviceLabel(linkIdx,     nodes.Count, nodes[linkIdx]);
+        if (nodes is null || nodes.Count < 2) return $"Hop {hopIdx}";
+        var from = GetDeviceLabel(hopIdx - 1, nodes.Count, nodes[hopIdx - 1]);
+        var to   = GetDeviceLabel(hopIdx,     nodes.Count, nodes[hopIdx]);
         return $"{from} → {to}";
     }
 
@@ -594,15 +773,15 @@
         if (Image?.DevicesVisited == null || Image.DevicesVisited.Count < 2)
             return string.Empty;
 
-        var nodes = Image.DevicesVisited;
-        var delays = Image.PerLinkDelayMs;
-        var rssi   = Image.PerLinkRssi;
-        int total  = nodes.Count;
-        int nodeW  = 110, nodeH = 44, gap = 90;
-        int svgH   = 120; // taller to fit delay + rssi labels
-        int svgW   = total * nodeW + (total - 1) * gap + 20;
-        int nodeY  = (svgH - nodeH) / 2; // vertically centred
-        int arrowY = nodeY + nodeH / 2;
+        var nodes    = Image.DevicesVisited;
+        var hopLat = Image.PerHopLatencyMs ?? new List<long>();
+        var rssi     = Image.PerLinkRssi;
+        int total    = nodes.Count;
+        int nodeW    = 110, nodeH = 44, gap = 90;
+        int svgH     = 120; // taller to fit latency + rssi labels
+        int svgW     = total * nodeW + (total - 1) * gap + 20;
+        int nodeY    = (svgH - nodeH) / 2; // vertically centred
+        int arrowY   = nodeY + nodeH / 2;
 
         var sb = new StringBuilder();
         sb.Append($"<svg viewBox=\"0 0 {svgW} {svgH}\" style=\"width:100%; min-width:{svgW}px; height:{svgH}px;\" xmlns=\"http://www.w3.org/2000/svg\">");
@@ -625,15 +804,15 @@
                 int arrowX1 = x + nodeW + gap;
                 int midX    = (arrowX0 + arrowX1) / 2;
 
-                // Delay above arrow
-                string delayLabel = (i + 1 < delays.Count && delays[i + 1] > 0)
-                    ? $"{delays[i + 1] - delays[i]} ms" : "—";
+                // Per-hop latency above arrow
+                string latencyLabel = (i + 1 < hopLat.Count && hopLat[i + 1] > 0)
+                    ? $"{hopLat[i + 1] - hopLat[i]} ms" : "—";
                 // RSSI below arrow
                 string rssiLabel = (rssi is not null && i + 1 < rssi.Count && rssi[i + 1] != 0)
                     ? $"{rssi[i + 1]} dBm" : "—";
 
                 sb.Append($"<line x1=\"{arrowX0}\" y1=\"{arrowY}\" x2=\"{arrowX1 - 4}\" y2=\"{arrowY}\" stroke=\"#888\" stroke-width=\"2\" marker-end=\"url(#arr-{TransmitterId})\"/>");
-                sb.Append($"<text x=\"{midX}\" y=\"{arrowY - 8}\" text-anchor=\"middle\" fill=\"#555\" font-size=\"10\">{delayLabel}</text>");
+                sb.Append($"<text x=\"{midX}\" y=\"{arrowY - 8}\" text-anchor=\"middle\" fill=\"#555\" font-size=\"10\">{latencyLabel}</text>");
                 sb.Append($"<text x=\"{midX}\" y=\"{arrowY + 18}\" text-anchor=\"middle\" fill=\"#c0392b\" font-size=\"10\">{rssiLabel}</text>");
             }
         }

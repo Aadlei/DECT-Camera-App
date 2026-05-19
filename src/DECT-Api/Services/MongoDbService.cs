@@ -102,7 +102,7 @@ public class MongoDbService
                 .ToList()
             : new List<string>(),
 
-        PerLinkDelayMs = doc.Contains("per_link_delay")
+        PerHopLatencyMs = doc.Contains("per_link_delay")
             ? doc["per_link_delay"].AsBsonArray
                 .Select(v => v.ToInt64())
                 .ToList()

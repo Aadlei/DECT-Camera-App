@@ -16,8 +16,8 @@ public class ImageDto
     public int SequenceNumber { get; set; }
     public int SizeBytes { get; set; }
     public List<string> DevicesVisited { get; set; } = new();
-    public List<long>   PerLinkDelayMs { get; set; } = new();
+    public List<long>   PerHopLatencyMs { get; set; } = new();
     public long EndToEndDelayMs => 
-        PerLinkDelayMs is { Count: > 0 } ? PerLinkDelayMs[^1] : 0; // index 0 is always 0
+        PerHopLatencyMs is { Count: > 0 } ? PerHopLatencyMs[^1] : 0; // index 0 is always 0
     public List<int> PerLinkRssi { get; set; } = new();
 }

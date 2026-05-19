@@ -202,12 +202,12 @@
 
         // ── Header row ────────────────────────────────────────────────────
         sb.AppendLine("Seq,FirmwareSeq,TransmitterId,DeviceTimestampUtc,ReceivedAtUtc,SizeBytes,HopCount," +
-                      "EndToEndDelayMs,PerLinkDelays_ms,PerLinkRssi_dBm");
+                      "EndToEndDelayMs,PerHopLatencies_ms,PerLinkRssi_dBm");
 
         // ── Data rows ─────────────────────────────────────────────────────
         foreach (var e in allEntries)
         {
-            var delays = e.PerLinkDelayMs?.Count > 0 ? string.Join(";", e.PerLinkDelayMs) : "";
+            var delays = e.PerHopLatencyMs?.Count > 0 ? string.Join(";", e.PerHopLatencyMs) : "";
             var rssi   = e.PerLinkRssi?.Count > 0    ? string.Join(";", e.PerLinkRssi)    : "";
 
             sb.AppendLine(string.Join(",",
@@ -224,7 +224,7 @@
         }
 
         // ── Summary footer ────────────────────────────────────────────────
-        var totalDropped  = _sessions.Values.Where(s => s is not null).Sum(s => s!.DroppedPackets);
+        var totalDropped  = _sessions.Values.Where(s => s is not null).Sum(s => s!.DroppedImages);
         var totalExpected = _sessions.Values.Where(s => s is not null).Sum(s => s!.TotalExpected);
         var lossPct = totalExpected > 0 ? totalDropped * 100.0 / totalExpected : 0;
 
@@ -242,8 +242,8 @@
         sb.AppendLine("# TransmitterId,Images,Bytes,Dropped,Expected,LossPct,AvgRssiDbm,AvgE2EMs,AvgHops");
         foreach (var (id, s) in _sessions.Where(kv => kv.Value is not null))
         {
-            var pct = s!.TotalExpected > 0 ? s.DroppedPackets * 100.0 / s.TotalExpected : 0;
-            sb.AppendLine($"# {id},{s.TotalImages},{s.TotalBytes},{s.DroppedPackets},{s.TotalExpected},{pct:F2},{s.AvgRssiDbm:F1},{s.AvgEndToEndDelayMs:F1},{s.AvgHopCount:F2}");
+            var pct = s!.TotalExpected > 0 ? s.DroppedImages * 100.0 / s.TotalExpected : 0;
+            sb.AppendLine($"# {id},{s.TotalImages},{s.TotalBytes},{s.DroppedImages},{s.TotalExpected},{pct:F2},{s.AvgRssiDbm:F1},{s.AvgEndToEndLatencyMs:F1},{s.AvgHopCount:F2}");
         }
         
         
@@ -251,11 +251,11 @@
 
         var chartIds = TransmitterIds!.SelectMany(id => new[]
         {
-            $"interarrival-chart-{id}",
+            $"endtoenddelay-chart-{id}",
             $"throughput-chart-{id}",
             $"linkdelay-chart-{id}",
             $"rssi-chart-{id}",
-            $"packetloss-chart-{id}",
+            $"imageloss-chart-{id}",
             $"topology-svg-{id}",
         }).ToList();
 
