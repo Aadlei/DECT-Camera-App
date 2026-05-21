@@ -554,6 +554,7 @@
         double binWidth = NiceBinWidth((max - min) / GoodputHistogramBins);
         if (binWidth <= 0 || double.IsNaN(binWidth) || double.IsInfinity(binWidth))
             binWidth = 1;
+        binWidth = Math.Max(1, binWidth);
 
         double start = Math.Floor(min   / binWidth) * binWidth;
         double end   = Math.Ceiling(max / binWidth) * binWidth;
